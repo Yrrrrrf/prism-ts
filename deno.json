@@ -1,0 +1,29 @@
+{
+	"name": "@yrrrrrf/prism-ts",
+	"version": "0.0.1-rc0",
+	"license": "MIT",
+	"exports": "./mod.ts",
+	"tasks": {
+		"dev": "deno test --watch",
+		"dev-test": "deno test --allow-net --allow-read"
+	},
+	"fmt": {
+		"indentWidth": 4,
+		"useTabs": true,
+		"singleQuote": false,
+		"lineWidth": 80
+	},
+	"lint": {
+		"rules": {
+			"tags": ["recommended"]
+		}
+	},
+	"publish": {
+		"exclude": [
+			".github/",
+			"resources/",
+			"tests/",
+			"jsr-pkg.md"
+		]
+	}
+}
