@@ -1,6 +1,5 @@
 // src/tools/type-generator.ts
 import { log } from "./logging.ts";
-import { ArrayType, JsonType } from "../common/types.ts";
 import {
 	ColumnMetadata,
 	EnumMetadata,
@@ -8,7 +7,7 @@ import {
 	TableMetadata,
 	ViewMetadata,
 } from "../client/types.ts";
-import { SQL_TYPE_MAPPINGS } from "../common/type-mappings.ts";
+import { ArrayType, JsonType, SQL_TYPE_MAPPINGS } from "../common/type-mappings.ts";
 
 /**
  * Enhanced TypeScript type generator for Prism-TS
