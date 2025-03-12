@@ -8,9 +8,11 @@ import { BaseClient } from "./client/base.ts";
 import { MetadataClient } from "./client/metadata.ts";
 import { createCrudOperations, CrudOperations } from "./client/crud.ts";
 import {
+	CacheStatus,
 	EnumMetadata,
 	FilterOptions,
 	FunctionMetadata,
+	HealthStatus,
 	SchemaMetadata,
 	TableMetadata,
 	ViewMetadata,
@@ -181,38 +183,36 @@ export class Prism {
 	): Promise<void> {
 		await this.client.post(`/${schemaName}/proc/${procedureName}`, params);
 	}
-
 	/**
 	 * Get API health status
 	 */
-	async getHealth() {
+	getHealth(): Promise<HealthStatus> {
 		return this.metadataClient.getHealth();
 	}
 
 	/**
 	 * Ping the API
 	 */
-	async ping() {
+	ping(): Promise<string> {
 		return this.metadataClient.ping();
 	}
 
 	/**
 	 * Get cache status
 	 */
-	async getCacheStatus() {
+	getCacheStatus(): Promise<CacheStatus> {
 		return this.metadataClient.getCacheStatus();
 	}
 
 	/**
 	 * Clear and reload metadata cache
 	 */
-	async clearCache() {
+	async clearCache(): Promise<{ status: string; message: string }> {
 		const result = await this.metadataClient.clearCache();
 		this.initialized = false;
 		this.initPromise = null;
 		return result;
 	}
-
 	/**
 	 * Display schema statistics
 	 */
