@@ -1,224 +1,467 @@
 /**
- * Logging utilities for Prism-TS
+ * Advanced logging utilities for the Prism TypeScript framework.
+ * Designed to match the functionality of the Python logging module.
  */
 
-// ANSI color codes
-const COLORS = {
-	reset: "\x1b[0m",
-	bold: "\x1b[1m",
-	dim: "\x1b[2m",
-	italic: "\x1b[3m",
-	underline: "\x1b[4m",
+// ===== Color and Style Codes =====
 
-	// Foreground colors
-	black: "\x1b[30m",
-	red: "\x1b[31m",
-	green: "\x1b[32m",
-	yellow: "\x1b[33m",
-	blue: "\x1b[34m",
-	magenta: "\x1b[35m",
-	cyan: "\x1b[36m",
-	white: "\x1b[37m",
-
-	// Background colors
-	bgBlack: "\x1b[40m",
-	bgRed: "\x1b[41m",
-	bgGreen: "\x1b[42m",
-	bgYellow: "\x1b[43m",
-	bgBlue: "\x1b[44m",
-	bgMagenta: "\x1b[45m",
-	bgCyan: "\x1b[46m",
-	bgWhite: "\x1b[47m",
-};
-
-// Text coloring functions
-export const color = {
+/**
+ * ANSI color and style codes.
+ */
+export enum ColorCode {
 	// Styles
-	bold: (text: string) => `${COLORS.bold}${text}${COLORS.reset}`,
-	dim: (text: string) => `${COLORS.dim}${text}${COLORS.reset}`,
-	italic: (text: string) => `${COLORS.italic}${text}${COLORS.reset}`,
-	underline: (text: string) => `${COLORS.underline}${text}${COLORS.reset}`,
+	RESET = "0",
+	BOLD = "1",
+	DIM = "2",
+	ITALIC = "3",
+	UNDERLINE = "4",
+	BLINK = "5",
+	REVERSE = "7",
+	STRIKE = "9",
 
-	// Colors
-	black: (text: string) => `${COLORS.black}${text}${COLORS.reset}`,
-	red: (text: string) => `${COLORS.red}${text}${COLORS.reset}`,
-	green: (text: string) => `${COLORS.green}${text}${COLORS.reset}`,
-	yellow: (text: string) => `${COLORS.yellow}${text}${COLORS.reset}`,
-	blue: (text: string) => `${COLORS.blue}${text}${COLORS.reset}`,
-	magenta: (text: string) => `${COLORS.magenta}${text}${COLORS.reset}`,
-	cyan: (text: string) => `${COLORS.cyan}${text}${COLORS.reset}`,
-	white: (text: string) => `${COLORS.white}${text}${COLORS.reset}`,
+	// Colors (foreground)
+	BLACK = "30",
+	RED = "31",
+	GREEN = "32",
+	YELLOW = "33",
+	BLUE = "34",
+	MAGENTA = "35",
+	CYAN = "36",
+	WHITE = "37",
 
-	// Combined styles
-	error: (text: string) =>
-		`${COLORS.bold}${COLORS.red}${text}${COLORS.reset}`,
-	success: (text: string) =>
-		`${COLORS.bold}${COLORS.green}${text}${COLORS.reset}`,
-	warning: (text: string) =>
-		`${COLORS.bold}${COLORS.yellow}${text}${COLORS.reset}`,
-	info: (text: string) =>
-		`${COLORS.bold}${COLORS.blue}${text}${COLORS.reset}`,
+	// Bright colors
+	BRIGHT_BLACK = "90",
+	BRIGHT_RED = "91",
+	BRIGHT_GREEN = "92",
+	BRIGHT_YELLOW = "93",
+	BRIGHT_BLUE = "94",
+	BRIGHT_MAGENTA = "95",
+	BRIGHT_CYAN = "96",
+	BRIGHT_WHITE = "97",
+}
+
+/**
+ * Apply ANSI color/style codes to text.
+ */
+export function colorize(
+	text: string,
+	...codes: (ColorCode | string)[]
+): string {
+	if (!codes.length) return text;
+
+	const codesStr = codes
+		.map((c) => typeof c === "string" ? c : c as string)
+		.join(";");
+
+	return `\x1b[${codesStr}m${text}\x1b[0m`;
+}
+
+// Cache for color functions to improve performance
+const colorFnCache = new Map<string, (text: string) => string>();
+
+/**
+ * Create a reusable color function for the given code.
+ */
+function createColorFn(code: ColorCode | string): (text: string) => string {
+	const codeKey = typeof code === "string" ? code : code as string;
+
+	if (!colorFnCache.has(codeKey)) {
+		colorFnCache.set(codeKey, (text: string) => colorize(text, code));
+	}
+
+	return colorFnCache.get(codeKey)!;
+}
+
+// ===== Style Functions =====
+
+// Basic styles
+export const bold = createColorFn(ColorCode.BOLD);
+export const dim = createColorFn(ColorCode.DIM);
+export const italic = createColorFn(ColorCode.ITALIC);
+export const underline = createColorFn(ColorCode.UNDERLINE);
+export const strike = createColorFn(ColorCode.STRIKE);
+
+// Basic colors
+export const black = createColorFn(ColorCode.BLACK);
+export const green = createColorFn(ColorCode.GREEN);
+export const yellow = createColorFn(ColorCode.YELLOW);
+export const blue = createColorFn(ColorCode.BLUE);
+export const cyan = createColorFn(ColorCode.CYAN);
+export const white = createColorFn(ColorCode.WHITE);
+
+// Custom RGB colors that match Python implementation
+export const violet = (s: string) => `\x1b[38;2;138;43;226m${s}\x1b[0m`;
+export const indigo = (s: string) => `\x1b[38;2;75;0;130m${s}\x1b[0m`;
+export const orange = (s: string) => `\x1b[38;2;255;165;0m${s}\x1b[0m`;
+export const red = (s: string) => `\x1b[38;2;255;0;0m${s}\x1b[0m`;
+export const pink = (s: string) => `\x1b[38;2;255;192;203m${s}\x1b[0m`;
+
+// Bright colors
+export const brightBlack = createColorFn(ColorCode.BRIGHT_BLACK);
+export const brightRed = createColorFn(ColorCode.BRIGHT_RED);
+export const brightGreen = createColorFn(ColorCode.BRIGHT_GREEN);
+export const brightYellow = createColorFn(ColorCode.BRIGHT_YELLOW);
+export const brightBlue = createColorFn(ColorCode.BRIGHT_BLUE);
+export const brightMagenta = createColorFn(ColorCode.BRIGHT_MAGENTA);
+export const brightCyan = createColorFn(ColorCode.BRIGHT_CYAN);
+export const brightWhite = createColorFn(ColorCode.BRIGHT_WHITE);
+
+// Combined styles
+export const errorStyle = (text: string) =>
+	colorize(text, ColorCode.BOLD, ColorCode.RED);
+export const successStyle = (text: string) =>
+	colorize(text, ColorCode.BOLD, ColorCode.GREEN);
+export const warningStyle = (text: string) =>
+	colorize(text, ColorCode.BOLD, ColorCode.YELLOW);
+export const infoStyle = (text: string) =>
+	colorize(text, ColorCode.BOLD, ColorCode.BLUE);
+
+// ===== Database Element Color Palette =====
+
+/**
+ * Color palette for database elements, matching the Python implementation.
+ */
+export const colorPalette: Record<string, (text: string) => string> = {
+	table: blue,
+	view: green,
+	enum: violet,
+	function: red,
+	procedure: orange,
+	trigger: pink,
+	schema: brightCyan,
+	column: (x: string) => x, // Default (no color)
+	pk: yellow,
+	fk: brightBlue,
+	type: dim,
 };
 
-// Database-element color scheme (matches Prism-PY)
-export const dbColors = {
-	table: color.blue,
-	view: color.green,
-	column: (text: string) => text, // No color
-	enum: color.magenta,
-	function: color.red,
-	procedure: color.yellow,
-	trigger: color.cyan,
-	schema: color.bold,
-};
+// ===== Text Utilities =====
 
-// Log levels
+/**
+ * Calculate visible length of string with ANSI codes removed.
+ */
+export function getAnsiLength(text: string): number {
+	// Using RegExp constructor to avoid control char linting issues
+	const ansiPattern = new RegExp(
+		"\u001b(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])",
+		"g",
+	);
+	return text.replace(ansiPattern, "").length;
+}
+
+/**
+ * Pad string with spaces, accounting for ANSI color codes.
+ */
+export function padStr(
+	text: string,
+	length: number,
+	align: "left" | "right" | "center" = "left",
+): string {
+	const visibleLength = getAnsiLength(text);
+	const padding = Math.max(0, length - visibleLength);
+
+	switch (align) {
+		case "right": {
+			return " ".repeat(padding) + text;
+		}
+		case "center": {
+			const leftPad = Math.floor(padding / 2);
+			const rightPad = padding - leftPad;
+			return " ".repeat(leftPad) + text + " ".repeat(rightPad);
+		}
+		default: { // left
+			return text + " ".repeat(padding);
+		}
+	}
+}
+
+// ===== Logging System =====
+
+/**
+ * Log levels with associated colors and severity values.
+ */
 export enum LogLevel {
 	TRACE = 0,
 	DEBUG = 1,
 	INFO = 2,
-	WARN = 3,
-	ERROR = 4,
-	NONE = 5,
+	WARNING = 4,
+	ERROR = 5,
+	NONE = 100, // Special level to disable all logging
 }
 
 /**
- * Logger class for Prism-TS
+ * Check if terminal features are available in the current environment
+ */
+function detectTerminalSupport(): boolean {
+	if (typeof Deno !== "undefined") {
+		// In Deno environment
+		return Deno.stdout.isTerminal();
+	}
+
+	// In browser or other environments, typically no terminal support
+	return false;
+}
+
+/**
+ * Enhanced logger with ANSI color support, timing utilities, and level filtering.
  */
 export class Logger {
+	private moduleName: string;
+	private indentLevel: number;
+	private showTimestamp: boolean;
 	private level: LogLevel;
-	private prefix: string;
-	private indentLevel = 0;
+	private enableConsole: boolean;
+	private isTerminal: boolean;
 
 	constructor(options: {
+		moduleName?: string;
 		level?: LogLevel;
-		prefix?: string;
+		enableConsole?: boolean;
+		showTimestamp?: boolean;
 	} = {}) {
-		this.level = options.level ?? LogLevel.INFO;
-		this.prefix = options.prefix ?? "Prism-TS";
+		this.moduleName = options.moduleName || "prism-ts";
+		this.indentLevel = 0;
+		this.showTimestamp = options.showTimestamp !== false;
+		this.level = options.level || LogLevel.INFO;
+		this.enableConsole = options.enableConsole !== false;
+
+		// Detect terminal support for colors
+		this.isTerminal = detectTerminalSupport();
 	}
 
 	/**
-	 * Set the log level
+	 * Set the minimum log level to display.
 	 */
-	setLevel(level: LogLevel): void {
-		this.level = level;
+	setLevel(level: LogLevel | string): void {
+		if (typeof level === "string") {
+			const levelKey = level.toUpperCase() as keyof typeof LogLevel;
+			if (LogLevel[levelKey] === undefined) {
+				const validLevels = Object.keys(LogLevel)
+					.filter((k) => isNaN(Number(k)))
+					.join(", ");
+				throw new Error(
+					`Invalid log level: ${level}. Valid levels are: ${validLevels}`,
+				);
+			}
+			this.level = LogLevel[levelKey] as unknown as LogLevel;
+		} else {
+			this.level = level;
+		}
 	}
 
 	/**
-	 * Format a log message
+	 * Format log message with consistent styling.
 	 */
-	private format(
-		level: string,
-		colorFn: (text: string) => string,
-		message: string,
-	): string {
-		const timestamp = new Date().toISOString();
+	private formatMsg(level: LogLevel, message: string): string {
+		const timestamp = this.showTimestamp
+			? `${
+				dim(new Date().toISOString().replace("T", " ").split(".")[0])
+			} `
+			: "";
+
 		const indent = "  ".repeat(this.indentLevel);
-		const formattedLevel = colorFn(`[${level}]`);
-		const formattedPrefix = color.cyan(`[${this.prefix}]`);
+		let levelStr: string;
 
+		switch (level) {
+			case LogLevel.TRACE: {
+				levelStr = dim(`[TRACE]`);
+				break;
+			}
+			case LogLevel.DEBUG: {
+				levelStr = colorize(
+					`[DEBUG]`,
+					ColorCode.DIM,
+					ColorCode.MAGENTA,
+				);
+				break;
+			}
+			case LogLevel.INFO: {
+				levelStr = blue(`[INFO]`);
+				break;
+			}
+			case LogLevel.WARNING: {
+				levelStr = yellow(`[WARNING]`);
+				break;
+			}
+			case LogLevel.ERROR: {
+				levelStr = red(`[ERROR]`);
+				break;
+			}
+			default: {
+				const levelName = LogLevel[level] || "UNKNOWN";
+				levelStr = `[${levelName}]`;
+			}
+		}
+
+		const moduleStr = cyan(`[${this.moduleName}]`);
 		return `${
-			color.dim(timestamp)
-		} ${formattedLevel} ${formattedPrefix} ${indent}${message}`;
+			italic(timestamp)
+		}${levelStr} ${moduleStr} ${indent}${message}`;
 	}
 
 	/**
-	 * Log a trace message
+	 * Log a message with the specified level if it meets the threshold.
+	 */
+	log(level: LogLevel, message: string): void {
+		if (!this.enableConsole || level < this.level) {
+			return;
+		}
+
+		console.log(this.formatMsg(level, message));
+	}
+
+	/**
+	 * Print a simple message without timestamp, level, or module name.
+	 * Only shows if log level is TRACE or lower.
+	 */
+	simple(message: string): void {
+		if (!this.enableConsole || this.level > LogLevel.TRACE) {
+			return;
+		}
+		console.log(message);
+	}
+
+	/**
+	 * Log a trace message.
 	 */
 	trace(message: string): void {
-		if (this.level <= LogLevel.TRACE) {
-			console.log(this.format("TRACE", color.dim, message));
-		}
+		this.log(LogLevel.TRACE, message);
 	}
 
 	/**
-	 * Log a debug message
+	 * Log a debug message.
 	 */
 	debug(message: string): void {
-		if (this.level <= LogLevel.DEBUG) {
-			console.log(this.format("DEBUG", color.magenta, message));
-		}
+		this.log(LogLevel.DEBUG, message);
 	}
 
 	/**
-	 * Log an info message
+	 * Log an info message.
 	 */
 	info(message: string): void {
-		if (this.level <= LogLevel.INFO) {
-			console.log(this.format("INFO", color.blue, message));
-		}
+		this.log(LogLevel.INFO, message);
 	}
 
 	/**
-	 * Log a warning message
+	 * Log a warning message.
 	 */
 	warn(message: string): void {
-		if (this.level <= LogLevel.WARN) {
-			console.log(this.format("WARN", color.yellow, message));
-		}
+		this.log(LogLevel.WARNING, message);
 	}
 
 	/**
-	 * Log an error message
+	 * Log an error message.
 	 */
 	error(message: string): void {
-		if (this.level <= LogLevel.ERROR) {
-			console.log(this.format("ERROR", color.red, message));
+		this.log(LogLevel.ERROR, message);
+	}
+
+	/**
+	 * Temporarily increase indentation for a block of code.
+	 */
+	indented<T>(fn: () => T, levels: number = 1): T {
+		this.indentLevel += levels;
+		try {
+			return fn();
+		} finally {
+			this.indentLevel = Math.max(0, this.indentLevel - levels);
 		}
 	}
 
 	/**
-	 * Increase indentation level
+	 * Time an operation and log its duration.
 	 */
-	indent(levels = 1): void {
-		this.indentLevel += levels;
+	async timed<T>(operation: string, fn: () => Promise<T>): Promise<T> {
+		const startTime = Date.now();
+		this.info(`Starting ${operation}...`);
+		try {
+			const result = await fn();
+			const elapsed = (Date.now() - startTime) / 1000;
+			this.debug(`${operation} completed in ${elapsed.toFixed(2)}s`);
+			return result;
+		} catch (error) {
+			const elapsed = (Date.now() - startTime) / 1000;
+			this.error(
+				`${operation} failed after ${elapsed.toFixed(2)}s: ${
+					(error as Error).message || String(error)
+				}`,
+			);
+			throw error;
+		}
 	}
 
 	/**
-	 * Decrease indentation level
+	 * Enable or disable console output.
 	 */
-	outdent(levels = 1): void {
-		this.indentLevel = Math.max(0, this.indentLevel - levels);
+	toggleConsole(enabled: boolean = true): void {
+		this.enableConsole = enabled;
 	}
 
 	/**
-	 * Log a section header
+	 * Print a section header.
 	 */
 	section(title: string): void {
-		if (this.level <= LogLevel.INFO) {
-			const separator = "=".repeat(50);
-			console.log(`\n${color.bold(separator)}`);
-			console.log(color.bold(title));
-			console.log(`${color.bold(separator)}\n`);
+		if (!this.enableConsole || this.level > LogLevel.INFO) {
+			return;
 		}
+
+		const header = `${"=".repeat(50)}\n${title}\n${"=".repeat(50)}`;
+		console.log(`\n${brightWhite(header)}`);
 	}
 
 	/**
-	 * Measure execution time of an async function
+	 * Print a formatted table with headers and rows.
 	 */
-	async time<T>(label: string, fn: () => Promise<T>): Promise<T> {
-		if (this.level <= LogLevel.DEBUG) {
-			const start = Date.now();
-			this.debug(`Starting: ${label}`);
-
-			try {
-				const result = await fn();
-				const duration = Date.now() - start;
-				this.debug(`Completed: ${label} (${duration}ms)`);
-				return result;
-			} catch (error) {
-				const duration = Date.now() - start;
-				this.error(
-					`Failed: ${label} (${duration}ms): ${error.message}`,
-				);
-				throw error;
-			}
-		} else {
-			return fn();
+	table(headers: string[], rows: unknown[][], widths?: number[]): void {
+		if (!this.enableConsole || this.level > LogLevel.INFO) {
+			return;
 		}
+
+		if (!widths) {
+			// Calculate widths based on content
+			widths = Array.from({ length: headers.length }, (_, i) => {
+				return Math.max(
+					getAnsiLength(String(headers[i])),
+					...rows.map((row) => getAnsiLength(String(row[i] || ""))),
+				);
+			});
+		}
+
+		// Top border
+		const borderTop = "┌" + widths.map((w) => "─".repeat(w + 2)).join("┬") +
+			"┐";
+		console.log(borderTop);
+
+		// Header row
+		const headerCells = headers.map((h, i) =>
+			padStr(brightWhite(String(h)), widths![i])
+		);
+		console.log("│ " + headerCells.join(" │ ") + " │");
+
+		// Separator
+		const separator = "├" + widths.map((w) => "─".repeat(w + 2)).join("┼") +
+			"┤";
+		console.log(separator);
+
+		// Data rows
+		for (const row of rows) {
+			const cells = row.map((cell, i) =>
+				padStr(String(cell || ""), widths![i])
+			);
+			console.log("│ " + cells.join(" │ ") + " │");
+		}
+
+		// Bottom border
+		const borderBottom = "└" +
+			widths.map((w) => "─".repeat(w + 2)).join("┴") + "┘";
+		console.log(borderBottom);
 	}
 }
 
-// Create a default logger instance
-export const log = new Logger();
+// Create a shared logger instance (default level is INFO)
+export const log: Logger = new Logger();
+
+// Example of how to change log level
+// log.setLevel(LogLevel.DEBUG);  // Show debug messages and above
+// log.setLevel("WARNING");       // Show only warnings and above
+// log.setLevel(LogLevel.NONE);   // Disable all logging

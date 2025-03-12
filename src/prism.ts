@@ -153,36 +153,36 @@ export class PrismTs {
 		await this.client.post(`/${schemaName}/proc/${procedureName}`, params);
 	}
 
-	/**
-	 * Get API health status
-	 */
-	async getHealth() {
-		return this.metadataClient.getHealth();
-	}
+	// /**
+	//  * Get API health status
+	//  */
+	// async getHealth() {
+	// 	return this.metadataClient.getHealth();
+	// }
 
-	/**
-	 * Ping the API
-	 */
-	async ping() {
-		return this.metadataClient.ping();
-	}
+	// /**
+	//  * Ping the API
+	//  */
+	// async ping() {
+	// 	return this.metadataClient.ping();
+	// }
 
-	/**
-	 * Get cache status
-	 */
-	async getCacheStatus() {
-		return this.metadataClient.getCacheStatus();
-	}
+	// /**
+	//  * Get cache status
+	//  */
+	// async getCacheStatus() {
+	// 	return this.metadataClient.getCacheStatus();
+	// }
 
-	/**
-	 * Clear and reload metadata cache
-	 */
-	async clearCache() {
-		const result = await this.metadataClient.clearCache();
-		this.initialized = false;
-		this.initPromise = null;
-		return result;
-	}
+	// /**
+	//  * Clear and reload metadata cache
+	//  */
+	// async clearCache() {
+	// 	const result = await this.metadataClient.clearCache();
+	// 	this.initialized = false;
+	// 	this.initPromise = null;
+	// 	return result;
+	// }
 
 	/**
 	 * Display schema statistics
