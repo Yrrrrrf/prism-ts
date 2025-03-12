@@ -7,7 +7,11 @@ import {
 	TableMetadata,
 	ViewMetadata,
 } from "../client/types.ts";
-import { ArrayType, JsonType, SQL_TYPE_MAPPINGS } from "../common/type-mappings.ts";
+import {
+	ArrayType,
+	JsonType,
+	SQL_TYPE_MAPPINGS,
+} from "../common/type-mappings.ts";
 
 /**
  * Enhanced TypeScript type generator for Prism-TS

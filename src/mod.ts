@@ -6,7 +6,7 @@
  */
 
 // Main classes
-export { PrismTs } from "./prism.ts";
+export { Prism } from "./prism.ts";
 export { BaseClient } from "./client/base.ts";
 export { MetadataClient } from "./client/metadata.ts";
 

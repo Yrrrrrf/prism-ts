@@ -1,5 +1,5 @@
 /**
- * Main PrismTs class
+ * Main Prism class
  *
  * This is the primary class for interacting with Prism-PY APIs
  */
@@ -15,6 +15,7 @@ import {
 	TableMetadata,
 	ViewMetadata,
 } from "./client/types.ts";
+import { TypeGenerator } from "./tools/type-generator.ts";
 
 export interface PrismOptions {
 	baseUrl: string;
@@ -22,18 +23,46 @@ export interface PrismOptions {
 }
 
 /**
- * PrismTs - TypeScript client for Prism-PY APIs
+ * Prism - TypeScript client for Prism-PY APIs
+ *
+ * @example
+ * ```typescript
+ * // Create with URL
+ * const prism = new Prism("http://localhost:8000");
+ *
+ * // OR create with options
+ * const prism = new Prism({ baseUrl: "http://localhost:8000", debug: true });
+ *
+ * // OR create with an existing BaseClient
+ * const client = new BaseClient("http://localhost:8000");
+ * const prism = new Prism(client);
+ * ```
  */
-export class PrismTs {
+export class Prism {
 	private client: BaseClient;
 	private metadataClient: MetadataClient;
 	private schemas: SchemaMetadata[] = [];
 	private initialized = false;
 	private initPromise: Promise<void> | null = null;
 
-	constructor(options: string | PrismOptions) {
-		const baseUrl = typeof options === "string" ? options : options.baseUrl;
-		this.client = new BaseClient(baseUrl);
+	/**
+	 * Create a new Prism client
+	 *
+	 * @param options URL string, options object, or BaseClient instance
+	 */
+	constructor(options: string | PrismOptions | BaseClient) {
+		if (options instanceof BaseClient) {
+			// Use the provided BaseClient instance directly
+			this.client = options;
+		} else {
+			// Create a new BaseClient from the URL or options
+			const baseUrl = typeof options === "string"
+				? options
+				: options.baseUrl;
+			this.client = new BaseClient(baseUrl);
+		}
+
+		// Initialize the metadata client with our client
 		this.metadataClient = new MetadataClient(this.client);
 	}
 
@@ -153,36 +182,36 @@ export class PrismTs {
 		await this.client.post(`/${schemaName}/proc/${procedureName}`, params);
 	}
 
-	// /**
-	//  * Get API health status
-	//  */
-	// async getHealth() {
-	// 	return this.metadataClient.getHealth();
-	// }
+	/**
+	 * Get API health status
+	 */
+	async getHealth() {
+		return this.metadataClient.getHealth();
+	}
 
-	// /**
-	//  * Ping the API
-	//  */
-	// async ping() {
-	// 	return this.metadataClient.ping();
-	// }
+	/**
+	 * Ping the API
+	 */
+	async ping() {
+		return this.metadataClient.ping();
+	}
 
-	// /**
-	//  * Get cache status
-	//  */
-	// async getCacheStatus() {
-	// 	return this.metadataClient.getCacheStatus();
-	// }
+	/**
+	 * Get cache status
+	 */
+	async getCacheStatus() {
+		return this.metadataClient.getCacheStatus();
+	}
 
-	// /**
-	//  * Clear and reload metadata cache
-	//  */
-	// async clearCache() {
-	// 	const result = await this.metadataClient.clearCache();
-	// 	this.initialized = false;
-	// 	this.initPromise = null;
-	// 	return result;
-	// }
+	/**
+	 * Clear and reload metadata cache
+	 */
+	async clearCache() {
+		const result = await this.metadataClient.clearCache();
+		this.initialized = false;
+		this.initPromise = null;
+		return result;
+	}
 
 	/**
 	 * Display schema statistics
@@ -229,6 +258,20 @@ export class PrismTs {
 				totalTables + totalViews + totalEnums + totalFunctions
 			}`,
 		);
+	}
+
+	/**
+	 * Generate TypeScript types from database metadata
+	 *
+	 * @param outputDir Directory where type files will be written
+	 */
+	async generateTypes(outputDir: string = "./src/gen"): Promise<void> {
+		await this.ensureInitialized();
+
+		const generator = new TypeGenerator();
+		await generator.generateTypes(this.schemas, outputDir);
+
+		return;
 	}
 
 	private async ensureInitialized(): Promise<void> {
