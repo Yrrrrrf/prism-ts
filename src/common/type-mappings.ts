@@ -1,65 +1,87 @@
 // src/common/type-mappings.ts
-
-import { SqlTypeCategory, TypeMapping } from "./types.ts";
+// Type for conversion functions (optional)
+export type TypeConverter = (value: unknown) => unknown;
 
 /**
- * Comprehensive mapping for SQL types to TypeScript types.
- * Designed to match the sophistication of the Python implementation.
+ * Comprehensive SQL type mapping configuration
+ */
+export interface TypeMapping {
+	sqlPattern: RegExp; // Regex pattern to match SQL type
+	tsType: string; // Corresponding TypeScript type
+	defaultValue: string; // Default value as string
+	converter?: TypeConverter; // Optional conversion function
+}
+
+/**
+ * TypeScript array type wrapper
+ */
+export class ArrayType {
+	constructor(public itemType: string) {}
+
+	toString(): string {
+		return `${this.itemType}[]`;
+	}
+}
+
+/**
+ * TypeScript JSON type wrapper
+ */
+export class JsonType {
+	constructor(public sampleData?: unknown) {}
+
+	toString(): string {
+		return "Record<string, unknown>";
+	}
+}
+
+/**
+ * Complete SQL to TypeScript type mapping definitions
  */
 export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	// Numeric types
 	{
 		sqlPattern: /^smallint$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^integer$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^bigint$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^decimal(\(\d+,\s*\d+\))?$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^numeric(\(\d+,\s*\d+\))?$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^real$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^double precision$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^serial$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 	{
 		sqlPattern: /^bigserial$/,
 		tsType: "number",
-		category: SqlTypeCategory.NUMERIC,
 		defaultValue: "0",
 	},
 
@@ -67,25 +89,21 @@ export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	{
 		sqlPattern: /^varchar(\(\d+\))?$/,
 		tsType: "string",
-		category: SqlTypeCategory.STRING,
 		defaultValue: '""',
 	},
 	{
 		sqlPattern: /^character varying(\(\d+\))?$/,
 		tsType: "string",
-		category: SqlTypeCategory.STRING,
 		defaultValue: '""',
 	},
 	{
 		sqlPattern: /^char(\(\d+\))?$/,
 		tsType: "string",
-		category: SqlTypeCategory.STRING,
 		defaultValue: '""',
 	},
 	{
 		sqlPattern: /^text$/,
 		tsType: "string",
-		category: SqlTypeCategory.STRING,
 		defaultValue: '""',
 	},
 
@@ -93,33 +111,28 @@ export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	{
 		sqlPattern: /^boolean$/,
 		tsType: "boolean",
-		category: SqlTypeCategory.BOOLEAN,
 		defaultValue: "false",
 	},
 	{
 		sqlPattern: /^bool$/,
 		tsType: "boolean",
-		category: SqlTypeCategory.BOOLEAN,
 		defaultValue: "false",
 	},
 
 	// Date/Time types
 	{
 		sqlPattern: /^timestamp(\(\d+\))?( with(out)? time zone)?$/,
-		tsType: "string", // Use string for dates in TS
-		category: SqlTypeCategory.TEMPORAL,
+		tsType: "string",
 		defaultValue: "new Date().toISOString()",
 	},
 	{
 		sqlPattern: /^date$/,
 		tsType: "string",
-		category: SqlTypeCategory.TEMPORAL,
 		defaultValue: "new Date().toISOString().split('T')[0]",
 	},
 	{
 		sqlPattern: /^time(\(\d+\))?( with(out)? time zone)?$/,
 		tsType: "string",
-		category: SqlTypeCategory.TEMPORAL,
 		defaultValue: "new Date().toISOString().split('T')[1]",
 	},
 
@@ -127,7 +140,6 @@ export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	{
 		sqlPattern: /^uuid$/,
 		tsType: "string",
-		category: SqlTypeCategory.UUID,
 		defaultValue: '""',
 	},
 
@@ -135,21 +147,18 @@ export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	{
 		sqlPattern: /^json$/,
 		tsType: "Record<string, unknown>",
-		category: SqlTypeCategory.JSON,
 		defaultValue: "{}",
 	},
 	{
 		sqlPattern: /^jsonb$/,
 		tsType: "Record<string, unknown>",
-		category: SqlTypeCategory.JSON,
 		defaultValue: "{}",
 	},
 
 	// Binary types
 	{
 		sqlPattern: /^bytea$/,
-		tsType: "string", // Used as base64 string
-		category: SqlTypeCategory.BINARY,
+		tsType: "string",
 		defaultValue: '""',
 	},
 
@@ -157,41 +166,35 @@ export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	{
 		sqlPattern: /^inet$/,
 		tsType: "string",
-		category: SqlTypeCategory.NETWORK,
 		defaultValue: '""',
 	},
 	{
 		sqlPattern: /^cidr$/,
 		tsType: "string",
-		category: SqlTypeCategory.NETWORK,
 		defaultValue: '""',
 	},
 	{
 		sqlPattern: /^macaddr$/,
 		tsType: "string",
-		category: SqlTypeCategory.NETWORK,
 		defaultValue: '""',
 	},
 
-	// Geometric types (all represented as strings)
+	// Geometric types
 	{
 		sqlPattern: /^point$/,
 		tsType: "string",
-		category: SqlTypeCategory.GEOMETRIC,
 		defaultValue: '""',
 	},
 	{
 		sqlPattern: /^line$/,
 		tsType: "string",
-		category: SqlTypeCategory.GEOMETRIC,
 		defaultValue: '""',
 	},
 
-	// Enum types (handled specially)
+	// Enum types
 	{
 		sqlPattern: /^enum$/,
 		tsType: "string",
-		category: SqlTypeCategory.ENUM,
 		defaultValue: '""',
 	},
 
@@ -199,7 +202,6 @@ export const SQL_TYPE_MAPPINGS: TypeMapping[] = [
 	{
 		sqlPattern: /.*/,
 		tsType: "unknown",
-		category: SqlTypeCategory.OTHER,
 		defaultValue: "undefined",
 	},
 ];

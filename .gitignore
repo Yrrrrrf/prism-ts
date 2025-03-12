@@ -16,4 +16,5 @@ Thumbs.db
 
 # Project files
 docs/
+.github/
 deno.lock
