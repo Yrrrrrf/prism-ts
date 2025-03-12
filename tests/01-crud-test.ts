@@ -1,4 +1,4 @@
-// 01-crud-test.ts
+// improved-crud-test.ts
 import { BaseClient, Prism } from "@yrrrrrf/prism-ts";
 import {
 	cyan,
@@ -8,11 +8,11 @@ import {
 	red,
 	yellow,
 } from "../src/tools/logging.ts";
-// import { log, LogLevel } from "@yrrrrrf/prism-ts/tools/logging";
-// import { cyan, green, red, yellow } from "@yrrrrrf/prism-ts/tools/logging";
-
-// Import crypto for UUID generation
-import { crypto } from "https://deno.land/std@0.224.0/crypto/mod.ts";
+import {
+	generateTestData,
+	generateUUID,
+	TestContext,
+} from "../examples/setup-test.ts";
 
 // Set log level for test verbosity
 log.setLevel(LogLevel.DEBUG);
@@ -22,275 +22,349 @@ const API_URL = "http://localhost:8000";
 
 // Define record type to avoid 'any'
 interface TableRecord {
-	id: string; // Make this explicitly a string since we're dealing with UUIDs
+	id: string;
 	[key: string]: unknown;
 }
 
 /**
- * Generate a UUID v4 string
- * This is needed since the API requires client-generated UUIDs
+ * Set up test environment and find a suitable table to test
  */
-function generateUUID(): string {
-	const bytes = new Uint8Array(16);
-	crypto.getRandomValues(bytes);
+async function setupTest(): Promise<TestContext | null> {
+	const context: TestContext = {
+		client: new BaseClient(API_URL),
+		prism: null as unknown as Prism,
+		schemaName: "",
+		tableName: "",
+		tableMetadata: null,
+		tableOps: null,
+	};
 
-	// Set version (4) and variant (RFC4122)
-	bytes[6] = (bytes[6] & 0x0f) | 0x40;
-	bytes[8] = (bytes[8] & 0x3f) | 0x80;
+	// Initialize the Prism client
+	context.prism = new Prism(context.client);
+	await context.prism.initialize();
+	log.info("Client initialized successfully");
 
-	// Convert to hex string
-	const uuid = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
+	// Get available schemas to find tables
+	const schemas = await context.prism.getSchemas();
+	if (schemas.length === 0) {
+		log.error("No schemas available to test");
+		return null;
+	}
 
-	// Format with dashes: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-	return `${uuid.slice(0, 8)}-${uuid.slice(8, 12)}-${uuid.slice(12, 16)}-${
-		uuid.slice(16, 20)
-	}-${uuid.slice(20)}`;
+	// Find first schema with tables to test
+	for (const s of schemas) {
+		const tables = Object.keys(s.tables || {});
+		if (tables.length > 0) {
+			context.schemaName = s.name;
+			context.tableName = tables[0];
+			context.tableMetadata = s.tables[context.tableName];
+			break;
+		}
+	}
+
+	if (!context.tableMetadata) {
+		log.error("No tables found to test CRUD operations");
+		return null;
+	}
+
+	log.info(
+		`Testing CRUD operations on ${cyan(context.schemaName)}.${
+			green(context.tableName)
+		}`,
+	);
+
+	// Display table structure
+	log.info("Table structure:");
+	context.tableMetadata.columns.forEach((column: any) => {
+		const isPK = column.isPrimaryKey ? yellow("PK") : "";
+		const isNullable = column.nullable ? "" : red("*");
+		log.simple(
+			`  ${column.name.padEnd(20)} ${
+				column.type.padEnd(15)
+			} ${isPK} ${isNullable}`,
+		);
+	});
+
+	// Get CRUD operations for the table
+	context.tableOps = await context.prism.getTableOperations<TableRecord>(
+		context.schemaName,
+		context.tableName,
+	);
+
+	return context;
 }
 
 /**
- * This test performs a complete CRUD lifecycle on a database table
+ * Test reading records
  */
-async function testCrudOperations() {
-	log.section("CRUD Operations Test");
+async function testRead(context: TestContext): Promise<void> {
+	log.info("\n=== TEST: READ OPERATION ===");
 
-	// Create client and connect to API
-	const client = new BaseClient(API_URL);
-	const prism = new Prism(client);
+	// List existing records
+	const existingRecords = await context.tableOps.findAll({ limit: 5 });
+	log.info(`Found ${existingRecords.length} existing records`);
+
+	if (existingRecords.length > 0) {
+		log.info("Sample record:");
+		console.log(existingRecords[0]);
+	}
+
+	log.info("✅ Read operation completed successfully");
+}
+
+/**
+ * Test creating a new record
+ */
+async function testCreate(context: TestContext): Promise<string | null> {
+	log.info("\n=== TEST: CREATE OPERATION ===");
+
+	// Generate test data
+	const testData = generateTestData(context.tableMetadata);
+
+	// Ensure we have an ID for this record
+	if (
+		!testData.id &&
+		context.tableMetadata.columns.some((col: any) =>
+			col.name === "id" && col.type.toLowerCase().includes("uuid")
+		)
+	) {
+		testData.id = generateUUID();
+		log.info(`Generated UUID for id field: ${String(testData.id)}`);
+	}
+
+	log.info("Test data for creation:");
+	console.log(testData);
 
 	try {
-		// Initialize the client
-		await prism.initialize();
-		log.info("Client initialized successfully");
+		const createdRecord = await context.tableOps.create(testData);
+		log.info("Successfully created record:");
+		console.log(createdRecord);
 
-		// Get available schemas to find tables
-		const schemas = await prism.getSchemas();
-		if (schemas.length === 0) {
-			log.error("No schemas available to test");
-			return;
-		}
+		// Store test data for later use
+		context.testData = testData;
 
-		// Find first schema with tables to test
-		let schemaName = "";
-		let tableName = "";
-		let testTable = null;
+		// Get the record ID
+		const recordId = typeof createdRecord.id === "string" ||
+				typeof createdRecord.id === "number"
+			? String(createdRecord.id)
+			: String(testData.id);
 
-		// Search for a suitable table to test
-		for (const s of schemas) {
-			const tables = Object.keys(s.tables || {});
-			if (tables.length > 0) {
-				schemaName = s.name;
-				tableName = tables[0];
-				testTable = s.tables[tableName];
-				break;
-			}
-		}
-
-		if (!testTable || !schemaName || !tableName) {
-			log.error("No tables found to test CRUD operations");
-			return;
+		if (!recordId) {
+			throw new Error("Created record doesn't have an ID");
 		}
 
 		log.info(
-			`Testing CRUD operations on ${cyan(schemaName)}.${
-				green(tableName)
+			`✅ Create operation completed successfully (ID: ${recordId})`,
+		);
+		return recordId;
+	} catch (error) {
+		log.error(
+			`❌ Create operation failed: ${
+				error instanceof Error ? error.message : String(error)
 			}`,
 		);
+		console.error(error);
+		return null;
+	}
+}
 
-		// Display table structure
-		log.info("Table structure:");
-		testTable.columns.forEach((column) => {
-			const isPK = column.isPrimaryKey ? yellow("PK") : "";
-			const isNullable = column.nullable ? "" : red("*");
-			log.simple(
-				`  ${column.name.padEnd(20)} ${
-					column.type.padEnd(15)
-				} ${isPK} ${isNullable}`,
-			);
+/**
+ * Test reading a specific record by ID
+ */
+async function testReadById(
+	context: TestContext,
+	recordId: string,
+): Promise<TableRecord | null> {
+	log.info("\n=== TEST: READ BY ID OPERATION ===");
+
+	try {
+		const fetchedRecord = await context.tableOps.findOne(recordId);
+		log.info("Fetched record by ID:");
+		console.log(fetchedRecord);
+
+		log.info("✅ Read by ID operation completed successfully");
+		return fetchedRecord;
+	} catch (error) {
+		log.error(
+			`❌ Read by ID operation failed: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+		return null;
+	}
+}
+
+/**
+ * Test updating a record
+ */
+async function testUpdate(
+	context: TestContext,
+	recordId: string,
+	fetchedRecord: TableRecord,
+): Promise<boolean> {
+	log.info("\n=== TEST: UPDATE OPERATION ===");
+
+	// Get the required fields from the table metadata
+	const requiredFields = context.tableMetadata.columns
+		.filter((col: any) => !col.nullable)
+		.map((col: any) => col.name);
+
+	log.info(`Required fields for update: ${requiredFields.join(", ")}`);
+
+	// Create update data with all required fields
+	const updateData: Record<string, unknown> = {};
+
+	// First, copy all required fields from the fetched record
+	if (requiredFields.length > 0) {
+		requiredFields.forEach((field: string) => {
+			updateData[field] = fetchedRecord[field];
 		});
+	}
 
-		// Get CRUD operations for the table
-		interface TableRecord {
-			id: string; // Make this explicitly a string since we're dealing with UUIDs
-			[key: string]: unknown;
-		}
-
-		const tableOps = await prism.getTableOperations<TableRecord>(
-			schemaName,
-			tableName,
+	// Then modify one field that isn't an ID
+	if (context.testData) {
+		const updateableFields = Object.keys(context.testData).filter((k) =>
+			!k.includes("id") && !requiredFields.includes(k)
 		);
 
-		// 1. READ - List existing records
-		log.info("\n1. Reading existing records...");
-		const existingRecords = await tableOps.findAll({ limit: 5 });
-		log.info(`Found ${existingRecords.length} existing records`);
+		if (updateableFields.length > 0) {
+			const fieldToUpdate = updateableFields[0];
 
-		if (existingRecords.length > 0) {
-			log.info("Sample record:");
-			console.log(existingRecords[0]);
-		}
-
-		// 2. CREATE - Create a new record
-		log.info("\n2. Creating new record...");
-
-		// Generate test data based on table structure
-		const testData: { [key: string]: unknown } = {};
-		testTable.columns.forEach((column) => {
-			// Generate appropriate test data based on column type
-			const type = column.type.toLowerCase();
-			const name = column.name;
-
-			if (name === "id" || column.isPrimaryKey) {
-				// Generate UUID for id field
-				if (type.includes("uuid")) {
-					testData[name] = generateUUID();
-				} else if (type.includes("int")) {
-					// Skip auto-increment integers, they'll be handled by the database
-					if (!column.isPrimaryKey) {
-						testData[name] = Math.floor(Math.random() * 100);
-					}
-				}
-			} else if (name === "status") {
-				// Handle status field specifically - likely has a check constraint
-				testData[name] = "active"; // Use a valid value that passes the check constraint
-			} else if (type.includes("varchar") || type.includes("text")) {
-				testData[name] = `Test_${
+			if (typeof context.testData[fieldToUpdate] === "string") {
+				updateData[fieldToUpdate] = `Updated_${
 					Math.random().toString(36).substring(2, 7)
 				}`;
-			} else if (type.includes("int")) {
-				testData[name] = Math.floor(Math.random() * 100);
-			} else if (type.includes("bool")) {
-				testData[name] = true;
-			} else if (type.includes("date") || type.includes("timestamp")) {
-				testData[name] = new Date().toISOString();
+			} else if (typeof context.testData[fieldToUpdate] === "number") {
+				updateData[fieldToUpdate] = Math.floor(Math.random() * 100) +
+					100;
+			} else if (typeof context.testData[fieldToUpdate] === "boolean") {
+				updateData[fieldToUpdate] = !context.testData[fieldToUpdate];
 			}
-		});
-
-		try {
-			// Ensure we have an ID for this record
-			if (
-				!testData.id &&
-				testTable.columns.some((col) =>
-					col.name === "id" && col.type.toLowerCase().includes("uuid")
-				)
-			) {
-				testData.id = generateUUID();
-				log.info(`Generated UUID for id field: ${String(testData.id)}`);
-			}
-
-			log.info("Final test data for creation:");
-			console.log(testData);
-
-			const createdRecord = await tableOps.create(testData);
-			log.info("Successfully created record:");
-			console.log(createdRecord);
-
-			// Get the record ID as string (since we're dealing with UUIDs)
-			const recordId = typeof createdRecord.id === "string" ||
-					typeof createdRecord.id === "number"
-				? createdRecord.id
-				: String(testData.id);
-
-			if (!recordId) {
-				throw new Error("Created record doesn't have an ID");
-			}
-
-			// 3. READ - Verify created record
-			log.info("\n3. Verifying created record...");
-			const fetchedRecord = await tableOps.findOne(recordId);
-			log.info("Fetched record by ID:");
-			console.log(fetchedRecord);
-
-			// 4. UPDATE - Update the record
-			log.info("\n4. Updating record...");
-
-			// Get the required fields from the fetched record
-			const requiredFields = testTable.columns
-				.filter((col) => !col.nullable)
-				.map((col) => col.name);
 
 			log.info(
-				`Required fields for update: ${requiredFields.join(", ")}`,
-			);
-
-			// Create update data with all required fields
-			const updateData: { [key: string]: unknown } = {};
-
-			// First, copy all required fields from the fetched record
-			if (requiredFields.length > 0) {
-				requiredFields.forEach((field) => {
-					// Include the original value in our update
-					updateData[field] = fetchedRecord[field];
-				});
-			}
-
-			// Then modify one field that isn't an ID
-			const updateableFields = Object.keys(testData).filter((k) =>
-				!k.includes("id") && !requiredFields.includes(k)
-			);
-
-			if (updateableFields.length > 0) {
-				const fieldToUpdate = updateableFields[0];
-
-				if (typeof testData[fieldToUpdate] === "string") {
-					updateData[fieldToUpdate] = `Updated_${
-						Math.random().toString(36).substring(2, 7)
-					}`;
-				} else if (typeof testData[fieldToUpdate] === "number") {
-					updateData[fieldToUpdate] =
-						Math.floor(Math.random() * 100) + 100;
-				} else if (typeof testData[fieldToUpdate] === "boolean") {
-					updateData[fieldToUpdate] = !testData[fieldToUpdate];
-				}
-
-				log.info(
-					`Updating field "${fieldToUpdate}" with: ${
-						String(updateData[fieldToUpdate])
-					}`,
-				);
-			}
-
-			// Log the full update data
-			log.info("Full update data:");
-			console.log(updateData);
-
-			// Make the update request
-			const updatedRecord = await tableOps.update(recordId, updateData);
-			log.info("Successfully updated record:");
-			console.log(updatedRecord);
-
-			// 5. DELETE - Delete the record
-			log.info("\n5. Deleting record...");
-			await tableOps.delete(recordId);
-			log.info(`Successfully deleted record with ID: ${recordId}`);
-
-			// 6. VERIFY DELETE - Try to fetch deleted record
-			log.info("\n6. Verifying deletion...");
-			try {
-				const deletedRecord = await tableOps.findOne(recordId);
-
-				if (deletedRecord) {
-					log.error("❌ Record still exists after deletion!");
-					console.log(deletedRecord);
-				} else {
-					log.info("✅ Record successfully deleted (returned null)");
-				}
-			} catch (_error) { // Prefixed with underscore to avoid unused var warning
-				log.info(
-					"✅ Record successfully deleted (not found exception)",
-				);
-			}
-		} catch (error) {
-			log.error(
-				`CRUD operations failed: ${
-					error instanceof Error ? error.message : String(error)
+				`Updating field "${fieldToUpdate}" with: ${
+					String(updateData[fieldToUpdate])
 				}`,
 			);
-			console.error(error);
+		}
+	}
+
+	// Log the full update data
+	log.info("Full update data:");
+	console.log(updateData);
+
+	try {
+		// Make the update request
+		const updatedRecord = await context.tableOps.update(
+			recordId,
+			updateData,
+		);
+		log.info("Successfully updated record:");
+		console.log(updatedRecord);
+
+		log.info("✅ Update operation completed successfully");
+		return true;
+	} catch (error) {
+		log.error(
+			`❌ Update operation failed: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+		console.error(error);
+		return false;
+	}
+}
+
+/**
+ * Test deleting a record
+ */
+async function testDelete(
+	context: TestContext,
+	recordId: string,
+): Promise<boolean> {
+	log.info("\n=== TEST: DELETE OPERATION ===");
+
+	try {
+		// Delete the record
+		await context.tableOps.delete(recordId);
+		log.info(`Successfully deleted record with ID: ${recordId}`);
+
+		// Verify deletion
+		log.info("Verifying deletion...");
+		try {
+			const deletedRecord = await context.tableOps.findOne(recordId);
+
+			if (deletedRecord) {
+				log.error("❌ Record still exists after deletion!");
+				console.log(deletedRecord);
+				return false;
+			} else {
+				log.info("✅ Record successfully deleted (returned null)");
+				return true;
+			}
+		} catch (_error) {
+			log.info("✅ Record successfully deleted (not found exception)");
+			return true;
 		}
 	} catch (error) {
 		log.error(
-			`Test failed: ${
+			`❌ Delete operation failed: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+		console.error(error);
+		return false;
+	}
+}
+
+/**
+ * Run all CRUD tests in sequence
+ */
+async function runCrudTests(): Promise<void> {
+	log.section("CRUD Operations Test Suite");
+
+	// Set up test environment
+	const context = await setupTest();
+	if (!context) {
+		log.error("Failed to set up test environment");
+		return;
+	}
+
+	try {
+		// 1. Test reading records (list)
+		await testRead(context);
+
+		// 2. Test creating a record
+		const recordId = await testCreate(context);
+		if (!recordId) {
+			log.error("Cannot continue tests without a valid record ID");
+			return;
+		}
+
+		// 3. Test reading the created record by ID
+		const fetchedRecord = await testReadById(context, recordId);
+		if (!fetchedRecord) {
+			log.error(
+				"Cannot continue tests without fetching the created record",
+			);
+			return;
+		}
+
+		// 4. Test updating the record
+		const updateSuccess = await testUpdate(
+			context,
+			recordId,
+			fetchedRecord,
+		);
+		if (!updateSuccess) {
+			log.warn("Update test failed, but continuing with deletion test");
+		}
+
+		// 5. Test deleting the record
+		await testDelete(context, recordId);
+	} catch (error) {
+		log.error(
+			`Test suite failed: ${
 				error instanceof Error ? error.message : String(error)
 			}`,
 		);
@@ -298,7 +372,7 @@ async function testCrudOperations() {
 	}
 }
 
-// Run the test
-testCrudOperations()
-	.then(() => log.info("CRUD test completed"))
-	.catch((error) => log.error(`CRUD test failed: ${error.message}`));
+// Run the test suite
+runCrudTests()
+	.then(() => log.info("CRUD test suite completed"))
+	.catch((error) => log.error(`CRUD test suite failed: ${error.message}`));

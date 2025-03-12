@@ -6,7 +6,6 @@
 <div align="center">
 
 [![JSR](https://jsr.io/badges/@yrrrrrf/prism-ts)](https://jsr.io/@yrrrrrf/prism-ts)
-[![GitHub: Prism-TS](https://img.shields.io/badge/GitHub-pristm--ts-181717?logo=github)](https://github.com/Yrrrrrf/prism-ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://choosealicense.com/licenses/mit/)
 
 <!-- [![Downloads](https://jsr.io/badges/downloads/@yrrrrrf/prism-ts)](https://jsr.io/@yrrrrrf/prism-ts) -->
