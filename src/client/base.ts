@@ -1,6 +1,12 @@
 /**
- * Base HTTP client for making requests to prism-py APIs
+ * Base HTTP client for making requests to Prism-PY APIs
  */
+
+export interface RequestOptions {
+	params?: Record<string, string | number | boolean>;
+	headers?: Record<string, string>;
+	timeout?: number;
+}
 
 export class PrismError extends Error {
 	constructor(
@@ -14,11 +20,6 @@ export class PrismError extends Error {
 	}
 }
 
-export interface RequestOptions extends RequestInit {
-	params?: Record<string, string | number | boolean>;
-	timeout?: number;
-}
-
 export class BaseClient {
 	constructor(private baseUrl: string) {
 		// Ensure baseUrl ends with a slash
@@ -26,22 +27,70 @@ export class BaseClient {
 	}
 
 	async get<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-		// Basic implementation - will be expanded
-		const url = this.buildUrl(endpoint, options.params);
-		const response = await fetch(url, {
-			...options,
-			method: "GET",
-		});
+		return this.request<T>({ ...options, method: "GET", endpoint });
+	}
 
-		if (!response.ok) {
-			throw new PrismError(
-				`HTTP error: ${response.status}`,
-				"HTTP_ERROR",
-				response.status,
-			);
+	async post<T>(
+		endpoint: string,
+		data?: unknown,
+		options: RequestOptions = {},
+	): Promise<T> {
+		return this.request<T>({ ...options, method: "POST", endpoint, data });
+	}
+
+	async put<T>(
+		endpoint: string,
+		data?: unknown,
+		options: RequestOptions = {},
+	): Promise<T> {
+		return this.request<T>({ ...options, method: "PUT", endpoint, data });
+	}
+
+	async delete<T>(
+		endpoint: string,
+		options: RequestOptions = {},
+	): Promise<T> {
+		return this.request<T>({ ...options, method: "DELETE", endpoint });
+	}
+
+	private async request<T>(
+		{ endpoint, method, data, params, headers, timeout = 10000 }: {
+			endpoint: string;
+			method: string;
+			data?: unknown;
+			params?: Record<string, string | number | boolean>;
+			headers?: Record<string, string>;
+			timeout?: number;
+		},
+	): Promise<T> {
+		const url = this.buildUrl(endpoint, params);
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+		try {
+			const response = await fetch(url, {
+				method,
+				headers: {
+					"Content-Type": "application/json",
+					...headers,
+				},
+				body: data ? JSON.stringify(data) : undefined,
+				signal: controller.signal,
+			});
+
+			if (!response.ok) {
+				throw new PrismError(
+					`HTTP error ${response.status}: ${response.statusText}`,
+					"HTTP_ERROR",
+					response.status,
+					await response.json().catch(() => null),
+				);
+			}
+
+			return await response.json();
+		} finally {
+			clearTimeout(timeoutId);
 		}
-
-		return await response.json();
 	}
 
 	private buildUrl(
@@ -55,7 +104,7 @@ export class BaseClient {
 
 		if (params) {
 			Object.entries(params).forEach(([key, value]) => {
-				if (value !== undefined && value !== null) {
+				if (value !== null && value !== undefined) {
 					url.searchParams.append(key, String(value));
 				}
 			});
