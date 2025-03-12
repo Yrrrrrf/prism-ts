@@ -1,12 +1,12 @@
 <h1 align="center">
-  <img src="./resources/img/prism.png" alt="Prism Icon" width="128" height="128" description="A prism that can take one light source and split it into multiple colors!">
+  <img src="https://raw.githubusercontent.com/Yrrrrrf/prism-ts/main/resources/img/prism.png" alt="Prism Icon" width="128" height="128" description="A prism that can take one light source and split it into multiple colors!">
   <div align="center">prism-ts</div>
 </h1>
 
 <div align="center">
 
 <!-- [![JSR](https://jsr.io/badges/prism-ts)](https://jsr.io/prism-ts) -->
-[![GitHub: Prism-TS](https://img.shields.io/badge/GitHub-pristm--ts-181717?logo=github)](https://github.com/Yrrrrrf/prims-ts)
+[![GitHub: Prism-TS](https://img.shields.io/badge/GitHub-pristm--ts-181717?logo=github)](https://github.com/Yrrrrrf/prism-ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://choosealicense.com/licenses/mit/)
 <!-- [![Downloads](https://img.shields.io/npm/dt/@jsr/prism-ts)](https://www.npmjs.com/package/@jsr/prism-ts) -->
 
