@@ -5,25 +5,22 @@
 
 <div align="center">
 
-<!-- [![JSR](https://jsr.io/badges/prism-ts)](https://jsr.io/prism-ts) -->
+[![JSR](https://jsr.io/badges/@yrrrrrf/prism-ts)](https://jsr.io/@yrrrrrf/prism-ts)
 [![GitHub: Prism-TS](https://img.shields.io/badge/GitHub-pristm--ts-181717?logo=github)](https://github.com/Yrrrrrf/prism-ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://choosealicense.com/licenses/mit/)
-<!-- [![Downloads](https://img.shields.io/npm/dt/@jsr/prism-ts)](https://www.npmjs.com/package/@jsr/prism-ts) -->
 
+<!-- [![Downloads](https://jsr.io/badges/downloads/@yrrrrrf/prism-ts)](https://jsr.io/@yrrrrrf/prism-ts) -->
 </div>
 
 ## Overview
 
-prism-ts is a TypeScript library designed to create a seamless bridge between
-[prism-py](https://github.com/Yrrrrrf/prism-py) generated APIs and frontend
-applications. It provides full type safety, automatic type generation, and a
-comprehensive set of utilities for interacting with your database-driven API.
+A TypeScript library designed provides full type safety, automatic type
+generation, and a comprehensive set of utilities for interacting with your
+database-driven API.
 
-This library is part of the Prism ecosystem:
-
-- **prism-py**: Python library that generates APIs from database schemas
-- **prism-ts**: TypeScript client that consumes prism-py APIs with full type
-  safety
+> **Note**: This library is part of the Prism ecosystem, which includes
+> [**prism-py**](https://github.com/Yrrrrrf/prism-py), a Python library that
+> generates APIs from database schemas.
 
 ## Features
 
@@ -34,7 +31,8 @@ This library is part of the Prism ecosystem:
 - **🔍 Type Inference**: Leverages TypeScript's type system for excellent IDE
   support
 - **📝 Query Builder**: Type-safe filter construction for API requests
-- **🧩 Zero Configuration**: Works out of the box with prism-py APIs
+- **🧩 Zero Configuration**: Works out of the box with
+  [**prism-py**](https://github.com/Yrrrrrf/prism-py) APIs
 
 ## Installation
 
@@ -106,59 +104,6 @@ await prism.generateTypes("./src/types");
 import { Product, User } from "./src/types";
 ```
 
-## API Operations
-
-### Table Operations
-
-```typescript
-// Get operations for a specific table
-const productOps = await prism.getTableOperations("store", "products");
-
-// Create
-const product = await productOps.create({
-	name: "New Product",
-	price: 29.99,
-	category_id: 5,
-});
-
-// Read with complex filtering
-const featuredProducts = await productOps.findMany({
-	where: {
-		is_featured: true,
-		category_id: 5,
-	},
-	orderBy: {
-		price: "asc",
-	},
-	limit: 20,
-});
-
-// Update
-await productOps.update(product.id, {
-	price: 24.99,
-	is_featured: false,
-});
-
-// Delete
-await productOps.delete(product.id);
-```
-
-### Metadata Operations
-
-```typescript
-// Get all database schemas
-const schemas = await prism.getSchemas();
-
-// Explore a specific schema
-const publicSchema = await prism.getSchema("public");
-
-// Get all tables in a schema
-const tables = await prism.getTables("public");
-
-// Get information about a specific table
-const userTable = await prism.getTable("public", "users");
-```
-
 ## Why prism-ts?
 
 - **End-to-End Type Safety**: From database to frontend
@@ -178,17 +123,3 @@ rapid, type-safe application development:
 2. Generate an API with prism-py
 3. Connect to the API with prism-ts
 4. Build your frontend with full type safety
-
-## Requirements
-
-- Deno ≥ 1.36.0 (for Deno projects)
-- Node.js ≥ 18.0.0 (when using with npm via deno2node)
-- A prism-py API to connect to
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.

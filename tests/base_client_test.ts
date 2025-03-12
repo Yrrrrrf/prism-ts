@@ -17,13 +17,11 @@ Deno.test("async test", async () => {
 	assertEquals(x, 3);
 });
 
-
 Deno.test("BaseClient - should append trailing slash to baseUrl", () => {
 	// const client = new BaseClient("http://localhost:8000");
 	// @ts-ignore - accessing private property for testing
 	// assertEquals(client.baseUrl, "http://localhost:8000/");
-  });
-
+});
 
 // Deno.test({
 // 	name: "read file test",

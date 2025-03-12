@@ -9,6 +9,8 @@
 export { BaseClient } from "./client/base.ts";
 export { PrismTs } from "./prism.ts";
 
+console.log("prism-ts v0.1.0");
+
 // // Export types
 // export type {
 //   FilterOptions,
