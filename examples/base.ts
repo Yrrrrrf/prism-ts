@@ -1,5 +1,6 @@
 // 00-client-test.ts
-import { BaseClient, displayInfo, Prism } from "@yrrrrrf/prism-ts";
+import { BaseClient, displayInfo, Prism } from "../src/mod.ts";
+// import { BaseClient, displayInfo, Prism } from "@yrrrrrf/prism-ts";
 import { log, LogLevel } from "../src/tools/logging.ts";
 // import { log, LogLevel } from "@yrrrrrf/prism-ts/tools/logging";
 
@@ -34,7 +35,6 @@ async function main() {
 		console.log("Displaying schema statistics:");
 		await prism.displaySchemaStats();
 
-		// // Assuming we've implemented SchemaDisplay similar to TS-Forge
 		// if (typeof prism.displaySchema === "function") {
 		// 	console.log("\nDetailed schema display:");
 		// 	await prism.displaySchema();

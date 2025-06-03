@@ -51,13 +51,13 @@ export function generateTestData(tableMetadata: any): Record<string, unknown> {
 		const type = column.type.toLowerCase();
 		const name = column.name;
 
-		if (name === "id" || column.isPrimaryKey) {
+		if (name === "id" || column.isPk) {
 			// Generate UUID for id field
 			if (type.includes("uuid")) {
 				testData[name] = generateUUID();
 			} else if (type.includes("int")) {
 				// Skip auto-increment integers, they'll be handled by the database
-				if (!column.isPrimaryKey) {
+				if (!column.isPk) {
 					testData[name] = Math.floor(Math.random() * 100);
 				}
 			}

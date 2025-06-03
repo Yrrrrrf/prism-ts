@@ -3,10 +3,14 @@ import { log } from "./logging.ts";
 import {
 	ColumnMetadata,
 	EnumMetadata,
+	FunctionMetadata, // <-- Make sure this is the updated one
 	SchemaMetadata,
 	TableMetadata,
 	ViewMetadata,
-} from "../client/types.ts";
+	// Assuming ReturnColumn might be needed for function return types
+	// and FunctionParameter for function parameters, though they might be
+	// accessed via the FunctionMetadata type itself.
+} from "../client/types.ts"; // Ensure this path is correct
 import {
 	ArrayType,
 	JsonType,
@@ -105,7 +109,10 @@ export class TypeGenerator {
 		// Generate table interfaces with enhanced typing
 		if (Object.keys(schema.tables).length > 0) {
 			content += "// Table interfaces\n";
-			for (const [tableName, table] of Object.entries(schema.tables)) {
+			// The unused variable 'tableName' was here.
+			// If it's not needed for logging or other logic, it's removed.
+			// If it *was* intended for use, it would be `const [tableName, table]`
+			for (const [, table] of Object.entries(schema.tables)) {
 				content += this.generateTableInterface(table);
 				content += "\n";
 
@@ -127,7 +134,9 @@ export class TypeGenerator {
 		// Generate enum types
 		if (Object.keys(schema.enums).length > 0) {
 			content += "// Enum types\n";
-			for (const [enumName, enumInfo] of Object.entries(schema.enums)) {
+			// The unused variable 'enumName' was here.
+			// for (const [_enumName, enumInfo] of Object.entries(schema.enums)) {
+			for (const [, enumInfo] of Object.entries(schema.enums)) {
 				content += this.generateEnum(enumInfo);
 				content += "\n";
 			}
@@ -136,8 +145,20 @@ export class TypeGenerator {
 		// Generate function parameter and result types
 		if (Object.keys(schema.functions).length > 0) {
 			content += "// Function types\n";
-			for (const [fnName, fn] of Object.entries(schema.functions)) {
+			// The unused variable 'fnName' was here.
+			// for (const [_fnName, fn] of Object.entries(schema.functions)) {
+			for (const [, fn] of Object.entries(schema.functions)) {
 				content += this.generateFunctionTypes(fn);
+				content += "\n";
+			}
+		}
+
+		// Generate procedure types (if they are distinct in SchemaMetadata and have parameters/return)
+		// Assuming procedures are also in `schema.procedures` and use `FunctionMetadata`
+		if (schema.procedures && Object.keys(schema.procedures).length > 0) {
+			content += "// Procedure types\n";
+			for (const [, proc] of Object.entries(schema.procedures)) {
+				content += this.generateFunctionTypes(proc, "Procedure"); // Pass a suffix
 				content += "\n";
 			}
 		}
@@ -181,7 +202,11 @@ export class TypeGenerator {
 		for (const column of view.columns) {
 			const tsType = this.mapSqlTypeToTs(column.type);
 			const nullable = column.nullable ? "?" : "";
-
+			// Views might not have detailed comments like PK/FK from direct table metadata
+			// const comment = this.generateColumnComment(column);
+			// if (comment) {
+			// 	code += `  /** ${comment} */\n`;
+			// }
 			code += `  ${column.name}${nullable}: ${tsType};\n`;
 		}
 
@@ -210,37 +235,88 @@ export class TypeGenerator {
 	/**
 	 * Generate function input and output types
 	 */
-	generateFunctionTypes(fn: any): string {
-		const baseName = this.toPascalCase(fn.name);
+	// Changed `fn: any` to `fn: FunctionMetadata`
+	generateFunctionTypes(fn: FunctionMetadata, suffix: string = ""): string {
+		const baseName = this.toPascalCase(fn.name) + suffix;
 		let code = "";
 
 		// Generate input parameters interface
 		if (fn.parameters && fn.parameters.length > 0) {
-			code += `export interface ${baseName}Params {\n`;
+			// Filter for IN or INOUT parameters for the Params interface
+			const inputParams = fn.parameters.filter((param) =>
+				param.mode === "IN" || param.mode === "INOUT"
+			);
 
-			for (const param of fn.parameters) {
-				if (param.mode === "IN" || param.mode === "INOUT") {
+			if (inputParams.length > 0) {
+				code += `export interface ${baseName}Params {\n`;
+				for (const param of inputParams) {
 					const tsType = this.mapSqlTypeToTs(param.type);
-					const nullable = param.hasDefault ? "?" : "";
-
+					// A parameter is optional if it has a default value.
+					// Or, if it's an OUT/INOUT param that might not be provided on input (though less common for pure input models).
+					// For a *Params model, `has_default` is the primary driver for optionality.
+					const nullable = param.has_default ? "?" : "";
 					code += `  ${param.name}${nullable}: ${tsType};\n`;
 				}
+				code += "}\n\n";
 			}
-
-			code += "}\n\n";
 		}
 
-		// Generate result type
-		if (fn.returnType) {
-			// Handle different return types
-			if (fn.returnType.includes("TABLE")) {
-				code += this.generateTableFunctionResult(
-					baseName,
-					fn.returnType,
-				);
+		// Generate result type/interface
+		// This needs to handle scalar returns, set returns (arrays), and table returns (objects or arrays of objects)
+		if (fn.return_type && fn.return_type.toLowerCase() !== "void") {
+			if (fn.return_columns && fn.return_columns.length > 0) {
+				// This is a table-returning function (or setof record where columns are defined)
+				code += `export interface ${baseName}ResultRow {\n`;
+				for (const col of fn.return_columns) {
+					const tsType = this.mapSqlTypeToTs(col.type);
+					// Columns in a result row are generally not nullable unless the SQL type itself implies it (which mapSqlTypeToTs handles)
+					// Or if the function can return partial rows (less common for SQL functions).
+					// Assuming columns are present.
+					code += `  ${col.name}: ${tsType};\n`;
+				}
+				code += "}\n\n";
+
+				// If the function returns a set (multiple rows), the result is an array of these rows.
+				// Otherwise, it's a single row object (or potentially null/undefined if no row is returned).
+				// `fn.type` from FunctionMetadata ("scalar", "table", "set") helps here.
+				if (fn.type === "set" || fn.type === "table") { // "table" often implies setof records
+					code +=
+						`export type ${baseName}Result = ${baseName}ResultRow[];\n`;
+				} else { // Assuming scalar returning a single complex record
+					code +=
+						`export type ${baseName}Result = ${baseName}ResultRow | null;\n`; // Or undefined
+				}
 			} else {
-				const resultType = this.mapSqlTypeToTs(fn.returnType);
-				code += `export type ${baseName}Result = ${resultType};\n`;
+				// Scalar or setof scalar return type
+				const resultTsType = this.mapSqlTypeToTs(fn.return_type);
+				if (fn.type === "set") {
+					code +=
+						`export type ${baseName}Result = ${resultTsType}[];\n`;
+				} else { // scalar
+					code +=
+						`export type ${baseName}Result = ${resultTsType} | null;\n`; // Or undefined
+				}
+			}
+		} else if (
+			fn.object_type === "procedure" &&
+			(!fn.return_type || fn.return_type.toLowerCase() === "void")
+		) {
+			// Procedures might not have an explicit return type in the same way functions do.
+			// If they have OUT/INOUT parameters, those form the "result".
+			const outParams = fn.parameters.filter((param) =>
+				param.mode === "OUT" || param.mode === "INOUT"
+			);
+			if (outParams.length > 0) {
+				code += `export interface ${baseName}Result {\n`;
+				for (const param of outParams) {
+					const tsType = this.mapSqlTypeToTs(param.type);
+					// OUT params are part of the result, nullability depends on SQL type.
+					code += `  ${param.name}: ${tsType};\n`;
+				}
+				code += "}\n\n";
+			} else {
+				// Procedure with no OUT params and void return.
+				code += `export type ${baseName}Result = void;\n`;
 			}
 		}
 
@@ -256,47 +332,22 @@ export class TypeGenerator {
 		let code = `export interface ${baseName}QueryParams {\n`;
 		code += `  limit?: number;\n`;
 		code += `  offset?: number;\n`;
-		code += `  order_by?: string;\n`;
+		code += `  order_by?: string;\n`; // Consider making this keyof ${baseName} if possible, but that's complex with aliases/DB names
 		code += `  order_dir?: "asc" | "desc";\n`;
 
 		// Add optional fields for each column
 		for (const column of table.columns) {
 			const tsType = this.mapSqlTypeToTs(column.type);
-			code += `  ${column.name}?: ${tsType};\n`;
+			// For query params, all filterable fields are optional.
+			code += `  ${column.name}?: ${tsType} | null;\n`; // Allow null for explicit null checks if API supports it
 		}
 
 		code += "}\n";
 		return code;
 	}
 
-	/**
-	 * Generate result type for table-returning functions
-	 */
-	private generateTableFunctionResult(
-		baseName: string,
-		returnType: string,
-	): string {
-		// Extract column definitions from TABLE(...) syntax
-		const columnsMatch = returnType.match(/TABLE\s*\((.*)\)/i);
-
-		if (!columnsMatch || !columnsMatch[1]) {
-			return `export type ${baseName}Result = Record<string, unknown>;\n`;
-		}
-
-		const columnDefs = columnsMatch[1].split(",").map((c) => c.trim());
-		let code = `export interface ${baseName}Result {\n`;
-
-		for (const colDef of columnDefs) {
-			const [name, type] = colDef.split(/\s+/, 2);
-			if (name && type) {
-				const tsType = this.mapSqlTypeToTs(type);
-				code += `  ${name}: ${tsType};\n`;
-			}
-		}
-
-		code += "}\n";
-		return code;
-	}
+	// Removed generateTableFunctionResult as its logic should be integrated into generateFunctionTypes
+	// based on `fn.return_columns` and `fn.type`.
 
 	/**
 	 * Generate JSDoc comment for a column
@@ -304,7 +355,8 @@ export class TypeGenerator {
 	private generateColumnComment(column: ColumnMetadata): string {
 		const comments = [];
 
-		if (column.isPrimaryKey) {
+		// Use the updated 'is_pk'
+		if (column.is_pk) {
 			comments.push("Primary key");
 		}
 
@@ -314,7 +366,8 @@ export class TypeGenerator {
 			);
 		}
 
-		if (column.isEnum) {
+		// Use the updated 'is_enum'
+		if (column.is_enum) {
 			comments.push("Enum type");
 		}
 
@@ -343,6 +396,14 @@ export class TypeGenerator {
 		// Ensure it doesn't start with a number
 		if (/^[0-9]/.test(safeValue)) {
 			safeValue = "_" + safeValue;
+		}
+		// Handle keywords by prefixing (more robustly later, this is basic)
+		if (
+			["delete", "default", "public", "private", "enum"].includes(
+				safeValue.toLowerCase(),
+			)
+		) {
+			safeValue = `_${safeValue}`;
 		}
 
 		return safeValue;

@@ -9,6 +9,7 @@
 export { Prism } from "./prism.ts";
 export { BaseClient } from "./client/base.ts";
 export { MetadataClient } from "./client/metadata.ts";
+export { TypeGenerator } from "./tools/type-generator.ts";
 
 // CRUD operations
 export { createCrudOperations } from "./client/crud.ts";

@@ -1,6 +1,12 @@
-// tests/type_mapping_test.ts
+// tests/type-mapping-test.ts
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
 import { TypeGenerator } from "../src/tools/type-generator.ts";
+import { // Import the necessary types for mocks
+	EnumMetadata,
+	FunctionMetadata,
+	TableMetadata,
+	// ColumnMetadata might be needed if you test deeper parts of TableMetadata generation
+} from "../src/client/types.ts";
 
 // Create an instance of TypeGenerator to use its methods
 const typeGenerator = new TypeGenerator();
@@ -67,7 +73,7 @@ Deno.test("SQL Type Mapping - Unusual/Edge Cases", () => {
 
 Deno.test("TypeGenerator - Generate Table Interface", () => {
 	// Create mock table data
-	const mockTable = {
+	const mockTable: TableMetadata = { // Added type annotation
 		name: "users",
 		schema: "public",
 		columns: [
@@ -75,48 +81,48 @@ Deno.test("TypeGenerator - Generate Table Interface", () => {
 				name: "id",
 				type: "uuid",
 				nullable: false,
-				isPrimaryKey: true,
-				isEnum: false,
+				is_pk: true, // Use is_pk
+				is_enum: false, // Use is_enum
 				references: undefined,
 			},
 			{
 				name: "username",
 				type: "varchar",
 				nullable: false,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 			{
 				name: "email",
 				type: "varchar",
 				nullable: false,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 			{
 				name: "is_active",
 				type: "boolean",
 				nullable: false,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 			{
 				name: "created_at",
 				type: "timestamp",
 				nullable: false,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 			{
 				name: "profile",
 				type: "jsonb",
 				nullable: true,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 		],
@@ -125,8 +131,9 @@ Deno.test("TypeGenerator - Generate Table Interface", () => {
 	// Generate interface
 	const result = typeGenerator.generateTableInterface(mockTable);
 
-	// Check interface structure using string contains instead of assertStringIncludes
+	// Check interface structure
 	assertEquals(result.includes("export interface Users {"), true);
+	assertEquals(result.includes("/** Primary key */"), true); // Check for comment
 	assertEquals(result.includes("id: string;"), true);
 	assertEquals(result.includes("username: string;"), true);
 	assertEquals(result.includes("email: string;"), true);
@@ -137,7 +144,7 @@ Deno.test("TypeGenerator - Generate Table Interface", () => {
 
 Deno.test("TypeGenerator - Generate Enum", () => {
 	// Create mock enum data
-	const mockEnum = {
+	const mockEnum: EnumMetadata = { // Added type annotation
 		name: "user_status",
 		schema: "public",
 		values: ["active", "inactive", "pending"],
@@ -155,7 +162,7 @@ Deno.test("TypeGenerator - Generate Enum", () => {
 
 Deno.test("TypeGenerator - Generate Query Interface", () => {
 	// Create mock table data
-	const mockTable = {
+	const mockTable: TableMetadata = { // Added type annotation
 		name: "products",
 		schema: "public",
 		columns: [
@@ -163,24 +170,24 @@ Deno.test("TypeGenerator - Generate Query Interface", () => {
 				name: "id",
 				type: "uuid",
 				nullable: false,
-				isPrimaryKey: true,
-				isEnum: false,
+				is_pk: true,
+				is_enum: false,
 				references: undefined,
 			},
 			{
 				name: "name",
 				type: "varchar",
 				nullable: false,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 			{
 				name: "price",
 				type: "numeric",
 				nullable: false,
-				isPrimaryKey: false,
-				isEnum: false,
+				is_pk: false,
+				is_enum: false,
 				references: undefined,
 			},
 		],
@@ -198,9 +205,9 @@ Deno.test("TypeGenerator - Generate Query Interface", () => {
 	assertEquals(result.includes("offset?: number;"), true);
 	assertEquals(result.includes("order_by?: string;"), true);
 	assertEquals(result.includes('order_dir?: "asc" | "desc";'), true);
-	assertEquals(result.includes("id?: string;"), true);
-	assertEquals(result.includes("name?: string;"), true);
-	assertEquals(result.includes("price?: number;"), true);
+	assertEquals(result.includes("id?: string | null;"), true); // updated to reflect generator change
+	assertEquals(result.includes("name?: string | null;"), true);
+	assertEquals(result.includes("price?: number | null;"), true);
 });
 
 Deno.test("TypeGenerator - PascalCase Conversion", () => {
@@ -210,7 +217,7 @@ Deno.test("TypeGenerator - PascalCase Conversion", () => {
 	assertEquals(typeGenerator.toPascalCase("simple"), "Simple");
 	assertEquals(
 		typeGenerator.toPascalCase("CamelCaseAlready"),
-		"Camelcasealready",
+		"Camelcasealready", // PascalCase converts to all lowercase then capitalizes first letter of each word
 	);
 	assertEquals(
 		typeGenerator.toPascalCase("snake_case_name"),
@@ -218,21 +225,26 @@ Deno.test("TypeGenerator - PascalCase Conversion", () => {
 	);
 });
 
-Deno.test("TypeGenerator - Generate Function Types", () => {
+Deno.test("TypeGenerator - Generate Function Types (Scalar Return)", () => {
 	// Create mock function data
-	const mockFunction = {
+	const mockFunction: FunctionMetadata = { // Added type annotation and missing fields
 		name: "get_user_by_id",
 		schema: "public",
-		returnType: "json",
+		type: "scalar", // Added
+		object_type: "function", // Added
+		is_strict: false, // Added
+		return_type: "json", // This will map to Record<string, unknown>
 		parameters: [
 			{
 				name: "user_id",
 				type: "uuid",
 				mode: "IN",
-				hasDefault: false,
-				defaultValue: null,
+				has_default: false,
+				default_value: null,
 			},
 		],
+		description: "Fetches a user by their ID.",
+		return_columns: null, // Explicitly null for non-table returns
 	};
 
 	// Generate function types
@@ -241,29 +253,107 @@ Deno.test("TypeGenerator - Generate Function Types", () => {
 	// Check result structure
 	assertEquals(result.includes("export interface GetUserByIdParams {"), true);
 	assertEquals(result.includes("user_id: string;"), true);
+	// Based on the updated TypeGenerator logic for scalar returning json
 	assertEquals(
 		result.includes(
-			"export type GetUserByIdResult = Record<string, unknown>;",
+			"export type GetUserByIdResult = Record<string, unknown> | null;", // Updated expected type
 		),
 		true,
 	);
 });
 
-Deno.test("TypeGenerator - Generate Table Function Result", () => {
+Deno.test("TypeGenerator - Generate Function Types (Table Return)", () => {
 	// Create mock function with TABLE return type
-	const mockFunction = {
+	const mockFunction: FunctionMetadata = { // Added type annotation and missing fields
 		name: "get_users",
 		schema: "public",
-		returnType: "TABLE(id uuid, username varchar, email varchar)",
+		type: "table", // "table" indicates it might return multiple rows
+		object_type: "function",
+		is_strict: false,
+		// For `return_columns` to be used, `return_type` itself can be more generic
+		// or specific. The `return_columns` field is key.
+		return_type: "SETOF record", // Or just "record", or even "TABLE(...)" - TypeGenerator prioritizes return_columns
 		parameters: [],
+		return_columns: [ // This is what TypeGenerator will use to build the ResultRow
+			{ name: "id", type: "uuid" },
+			{ name: "username", type: "varchar" },
+			{ name: "email", type: "varchar" },
+		],
+		description: "Fetches all users.",
 	};
 
 	// Generate function types
 	const result = typeGenerator.generateFunctionTypes(mockFunction);
 
-	// Check result structure
-	assertEquals(result.includes("export interface GetUsersResult {"), true);
+	// Check result structure based on updated TypeGenerator
+	assertEquals(result.includes("export interface GetUsersResultRow {"), true);
 	assertEquals(result.includes("id: string;"), true);
 	assertEquals(result.includes("username: string;"), true);
 	assertEquals(result.includes("email: string;"), true);
+	assertEquals(
+		result.includes("export type GetUsersResult = GetUsersResultRow[];"),
+		true,
+	);
+});
+
+Deno.test("TypeGenerator - Generate Function Types (Procedure with OUT params)", () => {
+	const mockProcedure: FunctionMetadata = {
+		name: "update_user_status",
+		schema: "public",
+		type: "scalar", // Procedures are often scalar in terms of direct SQL return, but "result" is via OUT params
+		object_type: "procedure",
+		is_strict: false,
+		return_type: "void", // Procedures typically return void
+		parameters: [
+			{
+				name: "p_user_id",
+				type: "uuid",
+				mode: "IN",
+				has_default: false,
+				default_value: null,
+			},
+			{
+				name: "p_new_status",
+				type: "varchar",
+				mode: "IN",
+				has_default: false,
+				default_value: null,
+			},
+			{
+				name: "o_updated_count",
+				type: "integer",
+				mode: "OUT",
+				has_default: false,
+				default_value: null,
+			},
+			{
+				name: "o_message",
+				type: "text",
+				mode: "OUT",
+				has_default: false,
+				default_value: null,
+			},
+		],
+		description: "Updates a user's status and returns a message.",
+		return_columns: null,
+	};
+
+	const result = typeGenerator.generateFunctionTypes(
+		mockProcedure,
+		"Procedure",
+	);
+
+	assertEquals(
+		result.includes("export interface UpdateUserStatusProcedureParams {"),
+		true,
+	);
+	assertEquals(result.includes("p_user_id: string;"), true);
+	assertEquals(result.includes("p_new_status: string;"), true);
+
+	assertEquals(
+		result.includes("export interface UpdateUserStatusProcedureResult {"),
+		true,
+	);
+	assertEquals(result.includes("o_updated_count: number;"), true);
+	assertEquals(result.includes("o_message: string;"), true);
 });

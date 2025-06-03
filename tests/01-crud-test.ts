@@ -76,7 +76,7 @@ async function setupTest(): Promise<TestContext | null> {
 	// Display table structure
 	log.info("Table structure:");
 	context.tableMetadata.columns.forEach((column: any) => {
-		const isPK = column.isPrimaryKey ? yellow("PK") : "";
+		const isPK = column.isPk ? yellow("PK") : "";
 		const isNullable = column.nullable ? "" : red("*");
 		log.simple(
 			`  ${column.name.padEnd(20)} ${
