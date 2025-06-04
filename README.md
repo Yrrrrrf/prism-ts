@@ -7,6 +7,7 @@
 
 [![JSR](https://jsr.io/badges/@yrrrrrf/prism-ts)](https://jsr.io/@yrrrrrf/prism-ts)
 [![JSR score](https://jsr.io/badges/@yrrrrrf/prism-ts/score)](https://jsr.io/@yrrrrrf/prism-ts)
+[![GitHub: Prism-py](https://img.shields.io/badge/GitHub-prism--ts-181717?logo=github)](https://github.com/Yrrrrrf/prism-ts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://choosealicense.com/licenses/mit/)
 
 </div>

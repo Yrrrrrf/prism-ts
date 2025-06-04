@@ -1,5 +1,12 @@
-// improved-crud-test.ts
-import { BaseClient, Prism } from "@yrrrrrf/prism-ts";
+// tests/01-crud-test.ts
+import {
+	assert,
+	assertEquals,
+	assertExists,
+	assertNotEquals,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { BaseClient, Prism } from "../src/mod.ts";
+import { ColumnMetadata } from "../src/client/types.ts";
 import {
 	cyan,
 	green,
@@ -10,369 +17,394 @@ import {
 } from "../src/tools/logging.ts";
 import {
 	generateTestData,
-	generateUUID,
 	TestContext,
-} from "../examples/setup-test.ts";
+	TestTableRecord,
+} from "./test-utils.ts";
 
-// Set log level for test verbosity
-log.setLevel(LogLevel.DEBUG);
-
-// Configuration
+log.setLevel(LogLevel.INFO);
 const API_URL = "http://localhost:8000";
 
-// Define record type to avoid 'any'
-interface TableRecord {
-	id: string;
-	[key: string]: unknown;
-}
+let testContext: TestContext | null = null;
+// let createdRecord: TestTableRecord | null = null; // Removed - use local variables in steps
+let recordIdToTest: string | number | undefined;
 
-/**
- * Set up test environment and find a suitable table to test
- */
-async function setupTest(): Promise<TestContext | null> {
-	const context: TestContext = {
-		client: new BaseClient(API_URL),
-		prism: null as unknown as Prism,
-		schemaName: "",
-		tableName: "",
-		tableMetadata: null,
-		tableOps: null,
-	};
+Deno.test("CRUD Operations Suite", async (t) => {
+	await t.step("Initialize Test Environment and Select Table", async () => {
+		log.section("SETUP: Initializing Test Environment");
+		const context: Partial<TestContext> = {
+			client: new BaseClient(API_URL),
+		};
 
-	// Initialize the Prism client
-	context.prism = new Prism(context.client);
-	await context.prism.initialize();
-	log.info("Client initialized successfully");
+		context.prism = new Prism(context.client as BaseClient);
+		await context.prism.initialize();
+		log.info("Prism client initialized successfully");
 
-	// Get available schemas to find tables
-	const schemas = await context.prism.getSchemas();
-	if (schemas.length === 0) {
-		log.error("No schemas available to test");
-		return null;
-	}
+		const schemas = await context.prism.getSchemas();
+		assert(schemas.length > 0, "No schemas available to test");
 
-	// Find first schema with tables to test
-	for (const s of schemas) {
-		const tables = Object.keys(s.tables || {});
-		if (tables.length > 0) {
-			context.schemaName = s.name;
-			context.tableName = tables[0];
-			context.tableMetadata = s.tables[context.tableName];
-			break;
+		let foundTable = false;
+		for (const s of schemas) {
+			const tables = Object.keys(s.tables || {});
+			if (tables.length > 0) {
+				context.schemaName = s.name;
+				context.tableName = tables[0];
+				context.tableMetadata = s.tables[context.tableName];
+				foundTable = true;
+				break;
+			}
 		}
-	}
+		assert(foundTable, "No tables found to test CRUD operations");
+		assertExists(
+			context.tableMetadata,
+			"Table metadata is missing after schema scan",
+		);
 
-	if (!context.tableMetadata) {
-		log.error("No tables found to test CRUD operations");
-		return null;
-	}
+		log.info(
+			`Selected table for testing: ${cyan(context.schemaName!)}.${
+				green(context.tableName!)
+			}`,
+		);
 
-	log.info(
-		`Testing CRUD operations on ${cyan(context.schemaName)}.${
-			green(context.tableName)
-		}`,
-	);
+		log.info("Table structure:");
+		context.tableMetadata.columns.forEach((column: ColumnMetadata) => {
+			const isPK = column.is_pk ? yellow("PK") : "";
+			const isNullable = column.nullable ? "" : red("*");
+			log.simple(
+				`  ${column.name.padEnd(20)} ${
+					column.type.padEnd(15)
+				} ${isPK} ${isNullable}`,
+			);
+		});
 
-	// Display table structure
-	log.info("Table structure:");
-	context.tableMetadata.columns.forEach((column: any) => {
-		const isPK = column.isPk ? yellow("PK") : "";
-		const isNullable = column.nullable ? "" : red("*");
-		log.simple(
-			`  ${column.name.padEnd(20)} ${
-				column.type.padEnd(15)
-			} ${isPK} ${isNullable}`,
+		context.tableOps = await context.prism.getTableOperations<
+			TestTableRecord
+		>(
+			context.schemaName!,
+			context.tableName!,
+		);
+
+		testContext = context as TestContext;
+		assertExists(testContext, "Test context setup failed");
+		assertExists(
+			testContext.tableMetadata,
+			"tableMetadata is missing in fully cast testContext",
 		);
 	});
 
-	// Get CRUD operations for the table
-	context.tableOps = await context.prism.getTableOperations<TableRecord>(
-		context.schemaName,
-		context.tableName,
-	);
+	await t.step("CREATE: Create a new record", async () => {
+		assertExists(
+			testContext?.tableMetadata,
+			"Table metadata missing in context for CREATE step",
+		);
+		log.info("\n=== TEST: CREATE OPERATION ===");
 
-	return context;
-}
-
-/**
- * Test reading records
- */
-async function testRead(context: TestContext): Promise<void> {
-	log.info("\n=== TEST: READ OPERATION ===");
-
-	// List existing records
-	const existingRecords = await context.tableOps.findAll({ limit: 5 });
-	log.info(`Found ${existingRecords.length} existing records`);
-
-	if (existingRecords.length > 0) {
-		log.info("Sample record:");
-		console.log(existingRecords[0]);
-	}
-
-	log.info("✅ Read operation completed successfully");
-}
-
-/**
- * Test creating a new record
- */
-async function testCreate(context: TestContext): Promise<string | null> {
-	log.info("\n=== TEST: CREATE OPERATION ===");
-
-	// Generate test data
-	const testData = generateTestData(context.tableMetadata);
-
-	// Ensure we have an ID for this record
-	if (
-		!testData.id &&
-		context.tableMetadata.columns.some((col: any) =>
-			col.name === "id" && col.type.toLowerCase().includes("uuid")
-		)
-	) {
-		testData.id = generateUUID();
-		log.info(`Generated UUID for id field: ${String(testData.id)}`);
-	}
-
-	log.info("Test data for creation:");
-	console.log(testData);
-
-	try {
-		const createdRecord = await context.tableOps.create(testData);
-		log.info("Successfully created record:");
-		console.log(createdRecord);
-
-		// Store test data for later use
-		context.testData = testData;
-
-		// Get the record ID
-		const recordId = typeof createdRecord.id === "string" ||
-				typeof createdRecord.id === "number"
-			? String(createdRecord.id)
-			: String(testData.id);
-
-		if (!recordId) {
-			throw new Error("Created record doesn't have an ID");
-		}
-
+		const initialData = generateTestData(testContext.tableMetadata);
+		testContext.testData = initialData;
+		// FIX: log.info with single argument
 		log.info(
-			`✅ Create operation completed successfully (ID: ${recordId})`,
-		);
-		return recordId;
-	} catch (error) {
-		log.error(
-			`❌ Create operation failed: ${
-				error instanceof Error ? error.message : String(error)
+			`Generated data for creation: ${
+				JSON.stringify(initialData, null, 2)
 			}`,
 		);
-		console.error(error);
-		return null;
-	}
-}
 
-/**
- * Test reading a specific record by ID
- */
-async function testReadById(
-	context: TestContext,
-	recordId: string,
-): Promise<TableRecord | null> {
-	log.info("\n=== TEST: READ BY ID OPERATION ===");
-
-	try {
-		const fetchedRecord = await context.tableOps.findOne(recordId);
-		log.info("Fetched record by ID:");
-		console.log(fetchedRecord);
-
-		log.info("✅ Read by ID operation completed successfully");
-		return fetchedRecord;
-	} catch (error) {
-		log.error(
-			`❌ Read by ID operation failed: ${
-				error instanceof Error ? error.message : String(error)
+		const apiCreatedRecord = await testContext.tableOps.create(initialData);
+		// FIX: log.info with single argument
+		log.info(
+			`Successfully created record: ${
+				JSON.stringify(apiCreatedRecord, null, 2)
 			}`,
 		);
-		return null;
-	}
-}
 
-/**
- * Test updating a record
- */
-async function testUpdate(
-	context: TestContext,
-	recordId: string,
-	fetchedRecord: TableRecord,
-): Promise<boolean> {
-	log.info("\n=== TEST: UPDATE OPERATION ===");
+		assertExists(apiCreatedRecord, "Failed to create record");
+		assertExists(apiCreatedRecord.id, "Created record has no ID");
+		recordIdToTest = apiCreatedRecord.id;
 
-	// Get the required fields from the table metadata
-	const requiredFields = context.tableMetadata.columns
-		.filter((col: any) => !col.nullable)
-		.map((col: any) => col.name);
+		for (const key in initialData) {
+			if (
+				initialData[key] !== undefined &&
+				apiCreatedRecord[key] !== undefined
+			) {
+				if (
+					initialData[key] instanceof Date &&
+					typeof apiCreatedRecord[key] === "string"
+				) {
+					assertEquals(
+						new Date(apiCreatedRecord[key] as string).toISOString(),
+						(initialData[key] as Date).toISOString(),
+					);
+				} else if (
+					typeof initialData[key] === "number" &&
+					typeof apiCreatedRecord[key] === "string"
+				) {
+					assertEquals(
+						String(initialData[key]),
+						String(apiCreatedRecord[key]),
+					);
+				} else {
+					assertEquals(
+						apiCreatedRecord[key],
+						initialData[key],
+						`Field ${key} mismatch`,
+					);
+				}
+			}
+		}
+		log.info(`✅ CREATE operation successful (ID: ${recordIdToTest})`);
+	});
 
-	log.info(`Required fields for update: ${requiredFields.join(", ")}`);
+	await t.step("READ: Fetch the created record by ID", async () => {
+		assertExists(
+			testContext,
+			"Test context not initialized for READ (FindOne) step",
+		);
+		assertExists(
+			recordIdToTest,
+			"Record ID not available for READ (FindOne) step",
+		);
+		log.info("\n=== TEST: READ BY ID OPERATION ===");
 
-	// Create update data with all required fields
-	const updateData: Record<string, unknown> = {};
+		const fetchedRecord = await testContext.tableOps.findOne(
+			recordIdToTest,
+		);
+		// FIX: log.info with single argument
+		log.info(
+			`Fetched record by ID: ${JSON.stringify(fetchedRecord, null, 2)}`,
+		);
 
-	// First, copy all required fields from the fetched record
-	if (requiredFields.length > 0) {
-		requiredFields.forEach((field: string) => {
-			updateData[field] = fetchedRecord[field];
+		assertExists(
+			fetchedRecord,
+			`Failed to fetch record with ID: ${recordIdToTest}`,
+		);
+		assertEquals(
+			fetchedRecord.id,
+			recordIdToTest,
+			"Fetched record ID does not match created ID",
+		);
+		testContext.fetchedRecord = fetchedRecord;
+		log.info("✅ READ BY ID operation successful");
+	});
+
+	await t.step("READ: List records (including the created one)", async () => {
+		assertExists(
+			testContext,
+			"Test context not initialized for READ (FindAll) step",
+		);
+		log.info("\n=== TEST: READ (FindAll) OPERATION ===");
+
+		const records: TestTableRecord[] = await testContext.tableOps.findAll({
+			limit: 10,
 		});
-	}
+		log.info(`Found ${records.length} records`);
+		assert(records.length > 0, "Expected to find at least one record");
 
-	// Then modify one field that isn't an ID
-	if (context.testData) {
-		const updateableFields = Object.keys(context.testData).filter((k) =>
-			!k.includes("id") && !requiredFields.includes(k)
+		const foundCreatedRecord = records.find((r: TestTableRecord) =>
+			r.id === recordIdToTest
 		);
+		assertExists(
+			foundCreatedRecord,
+			"Created record not found in findAll list",
+		);
+		log.info("✅ READ (FindAll) operation successful");
+	});
 
-		if (updateableFields.length > 0) {
-			const fieldToUpdate = updateableFields[0];
+	await t.step("UPDATE: Modify the created record", async () => {
+		assertExists(
+			testContext?.tableMetadata,
+			"Table metadata missing in context for UPDATE step",
+		);
+		assertExists(recordIdToTest, "Record ID not available for UPDATE step");
+		assertExists(
+			testContext.fetchedRecord,
+			"Fetched record (to be updated) not available",
+		);
+		assertExists(
+			testContext.testData,
+			"Original testData (for finding a field to change) not available",
+		);
+		log.info("\n=== TEST: UPDATE OPERATION ===");
 
-			if (typeof context.testData[fieldToUpdate] === "string") {
-				updateData[fieldToUpdate] = `Updated_${
+		// Start with a copy of the fetched record to ensure all required fields are present
+		// This is crucial if the PUT endpoint expects all fields for validation,
+		// even if only some are being changed.
+		const basePayload = { ...testContext.fetchedRecord };
+
+		let fieldToUpdate: keyof TestTableRecord | undefined;
+		let originalValueInFetchedRecord: unknown; // Value from the record we fetched (before update)
+		let newValue: unknown;
+
+		// Find a suitable field to update.
+		// Prefer a field that was part of the initial generated data for clearer test logic.
+		const potentialFieldsToUpdate = Object.keys(testContext.fetchedRecord)
+			.filter(
+				(key) =>
+					key !== "id" && key !== "created_at" &&
+					key !== "updated_at" &&
+					testContext!.testData &&
+					Object.hasOwn(testContext!.testData, key) && // Ensure it was in original generated data
+					testContext!.fetchedRecord &&
+					Object.hasOwn(testContext!.fetchedRecord, key), // And in fetched record
+			) as Array<keyof TestTableRecord>;
+
+		for (const key of potentialFieldsToUpdate) {
+			const fetchedVal = testContext.fetchedRecord[key];
+			if (typeof fetchedVal === "string") {
+				fieldToUpdate = key;
+				originalValueInFetchedRecord = fetchedVal; // This is the value we're changing FROM
+				newValue = `Updated_${fetchedVal}_${
 					Math.random().toString(36).substring(2, 7)
 				}`;
-			} else if (typeof context.testData[fieldToUpdate] === "number") {
-				updateData[fieldToUpdate] = Math.floor(Math.random() * 100) +
-					100;
-			} else if (typeof context.testData[fieldToUpdate] === "boolean") {
-				updateData[fieldToUpdate] = !context.testData[fieldToUpdate];
+				break;
+			} else if (typeof fetchedVal === "number") {
+				fieldToUpdate = key;
+				originalValueInFetchedRecord = fetchedVal;
+				newValue = fetchedVal + Math.floor(Math.random() * 100) + 50;
+				break;
+			} else if (typeof fetchedVal === "boolean") {
+				fieldToUpdate = key;
+				originalValueInFetchedRecord = fetchedVal;
+				newValue = !fetchedVal;
+				break;
 			}
-
-			log.info(
-				`Updating field "${fieldToUpdate}" with: ${
-					String(updateData[fieldToUpdate])
-				}`,
-			);
 		}
-	}
 
-	// Log the full update data
-	log.info("Full update data:");
-	console.log(updateData);
-
-	try {
-		// Make the update request
-		const updatedRecord = await context.tableOps.update(
-			recordId,
-			updateData,
+		assertExists(
+			fieldToUpdate,
+			"No suitable, non-PK, non-timestamp field found to update",
 		);
-		log.info("Successfully updated record:");
-		console.log(updatedRecord);
 
-		log.info("✅ Update operation completed successfully");
-		return true;
-	} catch (error) {
-		log.error(
-			`❌ Update operation failed: ${
-				error instanceof Error ? error.message : String(error)
+		// Construct the final payload.
+		// Pydantic_profile requires 'id', 'username', 'email'.
+		// Our basePayload (from fetchedRecord) already has these.
+		// We only modify the fieldToUpdate.
+		const updatePayload: Partial<TestTableRecord> = {
+			...basePayload, // Send all fields from the fetched record
+			[fieldToUpdate!]: newValue, // Override the field to be updated
+		};
+		// Ensure the ID in the payload matches the ID in the query param, as required by Pydantic_profile
+		// If your Pydantic model *doesn't* require 'id' in the body for PUT, you could delete it here.
+		// updatePayload.id = recordIdToTest; // Explicitly set if there's any doubt or if it's not in basePayload somehow
+
+		log.info(
+			`Attempting to update field "${fieldToUpdate}" from "${originalValueInFetchedRecord}" to "${newValue}"`,
+		);
+		log.info(
+			`Full update payload being sent: ${
+				JSON.stringify(updatePayload, null, 2)
 			}`,
 		);
-		console.error(error);
-		return false;
-	}
-}
 
-/**
- * Test deleting a record
- */
-async function testDelete(
-	context: TestContext,
-	recordId: string,
-): Promise<boolean> {
-	log.info("\n=== TEST: DELETE OPERATION ===");
+		// tableOps.update is expected to return the updated record directly (T)
+		// because src/client/crud.ts does: return response.updated_data[0];
+		const finalUpdatedRecord: TestTableRecord = await testContext.tableOps
+			.update(recordIdToTest, updatePayload);
+		log.info(
+			`Received updated record from tableOps.update: ${
+				JSON.stringify(finalUpdatedRecord, null, 2)
+			}`,
+		);
 
-	try {
-		// Delete the record
-		await context.tableOps.delete(recordId);
-		log.info(`Successfully deleted record with ID: ${recordId}`);
+		assertExists(
+			finalUpdatedRecord,
+			"Update operation did not return a record.",
+		);
 
-		// Verify deletion
-		log.info("Verifying deletion...");
+		// Verify the ID remains the same
+		assertEquals(
+			finalUpdatedRecord.id,
+			recordIdToTest,
+			"Updated record ID mismatch. Expected original ID.",
+		);
+
+		// Verify the specific field was updated
+		assertNotEquals(
+			finalUpdatedRecord[fieldToUpdate!],
+			originalValueInFetchedRecord,
+			`Field "${fieldToUpdate}" was not updated. Expected it to change from "${originalValueInFetchedRecord}".`,
+		);
+		assertEquals(
+			finalUpdatedRecord[fieldToUpdate!],
+			newValue,
+			`Field "${fieldToUpdate}" not updated to the expected new value. Expected: "${newValue}", Got: "${
+				finalUpdatedRecord[fieldToUpdate!]
+			}"`,
+		);
+
+		// Verify other fields (that were not part of updatePayload's direct changes) remain the same as in basePayload (fetchedRecord)
+		// This ensures the PUT operation didn't unintentionally nullify or alter other fields.
+		for (const key in basePayload) {
+			if (
+				Object.hasOwn(basePayload, key) && key !== fieldToUpdate &&
+				key !== "updated_at"
+			) { // Exclude updated_at as it WILL change
+				const k = key as keyof TestTableRecord;
+				assertEquals(
+					finalUpdatedRecord[k],
+					basePayload[k],
+					`Field "${k}" was unexpectedly changed during update.`,
+				);
+			}
+		}
+
+		// Check 'updated_at' - it should have changed or been updated
+		if (
+			finalUpdatedRecord.updated_at &&
+			testContext.fetchedRecord.updated_at
+		) {
+			assertNotEquals(
+				finalUpdatedRecord.updated_at,
+				testContext.fetchedRecord.updated_at,
+				"'updated_at' field should have been modified by the update operation.",
+			);
+		}
+
+		log.info("✅ UPDATE operation successful");
+	});
+
+	await t.step("DELETE: Remove the created record", async () => {
+		assertExists(
+			testContext,
+			"Test context not initialized for DELETE step",
+		);
+		assertExists(recordIdToTest, "Record ID not available for DELETE step");
+		log.info("\n=== TEST: DELETE OPERATION ===");
+
+		await testContext.tableOps.delete(recordIdToTest);
+		log.info(`Delete request sent for record ID: ${recordIdToTest}`);
+
 		try {
-			const deletedRecord = await context.tableOps.findOne(recordId);
-
-			if (deletedRecord) {
-				log.error("❌ Record still exists after deletion!");
-				console.log(deletedRecord);
-				return false;
-			} else {
-				log.info("✅ Record successfully deleted (returned null)");
-				return true;
-			}
-		} catch (_error) {
-			log.info("✅ Record successfully deleted (not found exception)");
-			return true;
-		}
-	} catch (error) {
-		log.error(
-			`❌ Delete operation failed: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
-		);
-		console.error(error);
-		return false;
-	}
-}
-
-/**
- * Run all CRUD tests in sequence
- */
-async function runCrudTests(): Promise<void> {
-	log.section("CRUD Operations Test Suite");
-
-	// Set up test environment
-	const context = await setupTest();
-	if (!context) {
-		log.error("Failed to set up test environment");
-		return;
-	}
-
-	try {
-		// 1. Test reading records (list)
-		await testRead(context);
-
-		// 2. Test creating a record
-		const recordId = await testCreate(context);
-		if (!recordId) {
-			log.error("Cannot continue tests without a valid record ID");
-			return;
-		}
-
-		// 3. Test reading the created record by ID
-		const fetchedRecord = await testReadById(context, recordId);
-		if (!fetchedRecord) {
-			log.error(
-				"Cannot continue tests without fetching the created record",
+			const fetchedAfterDelete = await testContext.tableOps.findOne(
+				recordIdToTest,
 			);
-			return;
+			assertEquals(
+				fetchedAfterDelete,
+				undefined,
+				"Record found after deletion, or findOne returning unexpected value.",
+			);
+		} catch (e) {
+			// FIX: Handle 'e' being unknown
+			if (e instanceof Error) {
+				log.info(`Fetch after delete failed as expected: ${e.message}`);
+				assert(
+					e.message.includes("No record found") ||
+						e.message.includes("not found") ||
+						e.message.includes("ID: " + recordIdToTest),
+					"Error message did not indicate record not found.",
+				);
+			} else {
+				log.error(
+					`Fetch after delete failed with non-Error type: ${
+						String(e)
+					}`,
+				);
+				assert(false, "Fetch after delete failed with non-Error type.");
+			}
 		}
-
-		// 4. Test updating the record
-		const updateSuccess = await testUpdate(
-			context,
-			recordId,
-			fetchedRecord,
+		log.info(
+			"✅ DELETE operation successful (verified by failed/empty fetch)",
 		);
-		if (!updateSuccess) {
-			log.warn("Update test failed, but continuing with deletion test");
-		}
+	});
 
-		// 5. Test deleting the record
-		await testDelete(context, recordId);
-	} catch (error) {
-		log.error(
-			`Test suite failed: ${
-				error instanceof Error ? error.message : String(error)
-			}`,
-		);
-		console.error(error);
-	}
-}
-
-// Run the test suite
-runCrudTests()
-	.then(() => log.info("CRUD test suite completed"))
-	.catch((error) => log.error(`CRUD test suite failed: ${error.message}`));
+	await t.step("Teardown: Test suite finished", () => {
+		log.section("TEARDOWN: CRUD Test suite finished");
+	});
+});

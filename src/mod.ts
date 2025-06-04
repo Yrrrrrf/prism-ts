@@ -1,3 +1,5 @@
+// src/mod.ts
+
 /**
  * prism-ts: TypeScript client for prism-py APIs
  *
@@ -7,13 +9,12 @@
 
 // Main classes
 export { Prism } from "./prism.ts";
-export { BaseClient } from "./client/base.ts";
+export { BaseClient, PrismError } from "./client/base.ts"; // <--- MODIFIED: Export PrismError class directly here
 export { MetadataClient } from "./client/metadata.ts";
-export { TypeGenerator } from "./tools/type-generator.ts";
 
 // CRUD operations
 export { createCrudOperations } from "./client/crud.ts";
-export type { CrudOperations } from "./client/crud.ts";
+export type { CrudOperations } from "./client/crud.ts"; // CrudOperations is an interface, so 'export type' is fine
 
 // Type exports
 export type {
@@ -22,10 +23,11 @@ export type {
 } from "./prism.ts";
 
 export type {
-	// Error handling
-	PrismError,
-	// Client options
-	RequestOptions,
+	// Client options (RequestOptions is an interface)
+	RequestOptions, 
+    // PrismError type can still be exported here if needed for purely type contexts,
+    // but the class export above makes it available as a value too.
+    // It's generally fine to just export the class, as its type is implicitly available.
 } from "./client/base.ts";
 
 export type {
@@ -37,17 +39,20 @@ export type {
 	FilterOptions,
 	FunctionMetadata,
 	FunctionParameter,
+	ReturnColumn, // Make sure ReturnColumn is exported if used in public types
+	TriggerEventData, // Make sure TriggerEventData is exported
+	TriggerMetadata,  // Make sure TriggerMetadata is exported
 	// Health and status
 	HealthStatus,
 	// Schema metadata types
 	SchemaMetadata,
 	TableMetadata,
 	ViewMetadata,
-} from "./client/types.ts";
+} from "./client/types.ts"; // Assuming these are all interfaces/types
 
 // Helper function to display package info
 export function displayInfo(): void {
-	console.log("prism-ts v0.1.0");
+	console.log("prism-ts v0.1.0"); // Consider updating this version string if it has changed
 	console.log("TypeScript client for prism-py APIs");
 	console.log("https://github.com/Yrrrrrf/prism-ts");
 }
