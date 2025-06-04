@@ -24,10 +24,10 @@ export type {
 
 export type {
 	// Client options (RequestOptions is an interface)
-	RequestOptions, 
-    // PrismError type can still be exported here if needed for purely type contexts,
-    // but the class export above makes it available as a value too.
-    // It's generally fine to just export the class, as its type is implicitly available.
+	RequestOptions,
+	// PrismError type can still be exported here if needed for purely type contexts,
+	// but the class export above makes it available as a value too.
+	// It's generally fine to just export the class, as its type is implicitly available.
 } from "./client/base.ts";
 
 export type {
@@ -39,14 +39,14 @@ export type {
 	FilterOptions,
 	FunctionMetadata,
 	FunctionParameter,
-	ReturnColumn, // Make sure ReturnColumn is exported if used in public types
-	TriggerEventData, // Make sure TriggerEventData is exported
-	TriggerMetadata,  // Make sure TriggerMetadata is exported
 	// Health and status
 	HealthStatus,
+	ReturnColumn, // Make sure ReturnColumn is exported if used in public types
 	// Schema metadata types
 	SchemaMetadata,
 	TableMetadata,
+	TriggerEventData, // Make sure TriggerEventData is exported
+	TriggerMetadata, // Make sure TriggerMetadata is exported
 	ViewMetadata,
 } from "./client/types.ts"; // Assuming these are all interfaces/types
 

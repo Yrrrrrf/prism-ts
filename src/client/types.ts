@@ -157,21 +157,29 @@ export interface CacheStatus {
 	procedures_cached: number;
 	triggers_cached: number;
 }
-
 // --- Client Operation Types ---
 
 /**
- * Options for filtering, sorting, and paginating API requests.
- * This is a client-side construct used by `CrudOperations`.
+ * Represents a single value or an array for "IN" style clauses, or null for "IS NULL".
  */
-export interface FilterOptions {
-	where?: Record<string, unknown>; // For simple key-value equality filters.
-	orderBy?: string; // Field name to order by.
-	orderDir?: "asc" | "desc"; // Direction of ordering.
+export type WhereClauseValue<V> = V | V[] | null;
+
+/**
+ * Type for basic equality/IN/IS NULL where clauses.
+ * T is the type of the entity being queried.
+ */
+export type WhereClause<T> = {
+	[K in keyof T]?: WhereClauseValue<T[K]>;
+};
+
+/**
+ * Options for filtering, sorting, and paginating API requests.
+ * T is the type of the entity being queried, used for type-safe 'where' clauses.
+ */
+export interface FilterOptions<T = Record<string, unknown>> { // <<<< MADE GENERIC HERE
+	where?: WhereClause<Partial<T>>; // Use Partial<T> for where to allow filtering on subset of fields
+	orderBy?: string;
+	orderDir?: "asc" | "desc";
 	limit?: number;
 	offset?: number;
 }
-
-// Note: RequestOptions and PrismError from the original src/client/base.ts
-// are client-specific and don't directly map to OpenAPI metadata response models,
-// so they can remain as they were if they serve their purpose for client operations.
